@@ -45,7 +45,7 @@
   }
   .wrap { max-width: 1060px; margin: 0 auto; }
 
-  header { text-align: center; margin-bottom: 28px; }
+  header { text-align: center; margin-bottom: 18px; }
   header .brand {
     font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--gold); font-weight: 700;
@@ -56,9 +56,17 @@
   /* ---------- API key bar ---------- */
   .keybar {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 14px 18px; margin-bottom: 20px;
-    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    padding: 12px 18px; margin-bottom: 16px;
   }
+  .keybar summary {
+    cursor: pointer; font-weight: 600; font-size: 0.9rem; color: var(--accent);
+    list-style: none; user-select: none;
+  }
+  .keybar summary::-webkit-details-marker { display: none; }
+  .keybar summary::before { content: "▸ "; }
+  .keybar[open] summary::before { content: "▾ "; }
+  .keybar[open] summary { margin-bottom: 10px; }
+  .keybar .keyrow + .keyrow { margin-top: 8px; }
   .keybar label { font-weight: 600; font-size: 0.9rem; white-space: nowrap; }
   .keybar input {
     flex: 1; min-width: 220px; padding: 9px 12px;
@@ -80,8 +88,32 @@
   .key-status.bad { color: var(--danger); }
 
   /* ---------- layout ---------- */
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+  /* Output panel follows the user while they scroll the form — generate,
+     refine and copy stay visible at all times (no hunting, no scrolling back) */
+  #outCard {
+    position: sticky; top: 12px;
+    max-height: calc(100vh - 24px); overflow-y: auto;
+  }
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; }
+    #outCard { position: static; max-height: none; }
+  }
+
+  /* Collapsible sections keep the form short (progressive disclosure) */
+  details.fold summary {
+    cursor: pointer; font-weight: 600; font-size: 0.88rem;
+    list-style: none; user-select: none;
+  }
+  details.fold summary::-webkit-details-marker { display: none; }
+  details.fold summary::before { content: "▸ "; color: var(--accent); }
+  details.fold[open] summary::before { content: "▾ "; }
+  details.fold .fold-body { margin-top: 8px; }
+  details.fold.dragover {
+    outline: 2px dashed var(--accent); outline-offset: 3px;
+    background: var(--accent-soft); border-radius: 8px;
+  }
+  #jdText { max-height: 110px; overflow-y: auto; }
 
   .card {
     background: var(--card); border: 1px solid var(--line);
@@ -210,8 +242,9 @@
     <p>Fill in the details, click Generate, copy, send. That's it.</p>
   </header>
 
-  <!-- ========== API KEY ========== -->
-  <div class="keybar">
+  <!-- ========== API KEY (collapsible — opens automatically when no key is set) ========== -->
+  <details class="keybar" id="keybar">
+    <summary id="keybarSummary">🔑 API keys</summary>
     <div class="keyrow" id="proxyNote" style="display:none">
       <span class="key-status ok">✓ This site has a managed API key — nothing to paste. Just fill in the form and generate.</span>
     </div>
@@ -238,7 +271,7 @@
       🔒 Keys are saved only in <em>your</em> browser (localStorage) and sent over HTTPS directly to the provider —
       they are never in the code, never uploaded anywhere else, and nobody else can see them.
     </div>
-  </div>
+  </details>
 
   <div class="grid">
 
@@ -287,16 +320,18 @@
         <textarea id="keyPoints" placeholder="One per line or free text, e.g.&#10;Monday interview, 11 AM&#10;Microsoft Teams link to follow"></textarea>
       </div>
 
-      <div class="field">
-        <label for="jdText">Job description <span class="opt">(optional — the email will pull relevant details like role title &amp; skills)</span></label>
-        <textarea id="jdText" style="min-height:64px" placeholder="Paste the JD text here, or attach a file below"></textarea>
-        <div class="jd-actions">
-          <input type="file" id="jdFile" accept=".txt,.md,.text,.pdf,.docx" hidden>
-          <button type="button" class="btn btn-ghost btn-small" id="jdAttachBtn">📎 Attach JD (.pdf / .docx / .txt)</button>
-          <button type="button" class="btn btn-ghost btn-small" id="jdClearBtn">Clear</button>
-          <span class="opt-note" id="jdStatus"></span>
+      <details class="field fold" id="jdFold">
+        <summary id="jdSummary">📄 Job description <span class="opt">(optional — attach or drop a file to make the email role-specific)</span></summary>
+        <div class="fold-body">
+          <textarea id="jdText" style="min-height:64px" placeholder="Paste the JD text, drag &amp; drop a .pdf/.docx/.txt onto this section, or attach below"></textarea>
+          <div class="jd-actions">
+            <input type="file" id="jdFile" accept=".txt,.md,.text,.pdf,.docx" hidden>
+            <button type="button" class="btn btn-ghost btn-small" id="jdAttachBtn">📎 Attach JD (.pdf / .docx / .txt)</button>
+            <button type="button" class="btn btn-ghost btn-small" id="jdClearBtn">Clear</button>
+            <span class="opt-note" id="jdStatus"></span>
+          </div>
         </div>
-      </div>
+      </details>
 
       <div class="row2">
         <div class="field">
@@ -332,8 +367,8 @@
       </button>
     </section>
 
-    <!-- ========== OUTPUT ========== -->
-    <section class="card">
+    <!-- ========== OUTPUT (sticky — follows the user while they scroll the form) ========== -->
+    <section class="card" id="outCard">
       <h2>📧 Generated email</h2>
 
       <div class="out-empty" id="outEmpty">
@@ -490,6 +525,7 @@ const refineInput = $("refineInput");
 let selectedLength = "Concise";
 let lastEmail = null;      // { subject, body }
 let lastInputs = null;     // inputs used for the last generation (for regenerate)
+let proxyAvailable = false; // set true by probeProxy() when a managed key exists
 
 function toast(msg) {
   const t = $("toast");
@@ -522,8 +558,10 @@ for (const cfg of Object.values(KEYS)) {
   });
 }
 providerSelect.value = localStorage.getItem(PROVIDER_STORAGE) || "gemini";
-providerSelect.addEventListener("change", () =>
-  localStorage.setItem(PROVIDER_STORAGE, providerSelect.value));
+providerSelect.addEventListener("change", () => {
+  localStorage.setItem(PROVIDER_STORAGE, providerSelect.value);
+  updateKeybarSummary();
+});
 autoSelectProvider();
 
 function updateKeyStatus(cfg) {
@@ -546,6 +584,25 @@ function autoSelectProvider() {
   if (hasGemini !== hasOpenAI) {
     providerSelect.value = hasGemini ? "gemini" : "openai";
     localStorage.setItem(PROVIDER_STORAGE, providerSelect.value);
+  }
+  updateKeybarSummary();
+}
+
+/* The key bar is collapsed to one line once set up; its summary always shows
+   the current state. It opens itself only when the user still needs to act. */
+function updateKeybarSummary() {
+  const s = $("keybarSummary");
+  if (proxyAvailable) {
+    s.textContent = "🔑 API — ✓ managed key active, nothing to paste";
+    $("keybar").open = false;
+    return;
+  }
+  const cfg = KEYS[providerSelect.value];
+  if (cfg.input.value.trim()) {
+    s.textContent = `🔑 API keys — ✓ ${cfg.label} active`;
+  } else {
+    s.textContent = "🔑 API keys — paste a free key to start";
+    $("keybar").open = true;
   }
 }
 
@@ -756,9 +813,8 @@ function buildUserPrompt(inputs, refinement) {
    account/region), and the first working model is remembered per browser.
    ============================================================================ */
 /* Managed-key proxy: when this site is deployed with server-side keys
-   (see netlify/functions/generate.js), the browser needs no key at all.
+   (see netlify/functions/generate.mjs), the browser needs no key at all.
    Probed once at load; falls back silently to bring-your-own-key mode. */
-let proxyAvailable = false;
 (async function probeProxy() {
   try {
     const res = await fetch("/.netlify/functions/generate", { method: "GET" });
@@ -770,6 +826,7 @@ let proxyAvailable = false;
       $("geminiRow").style.display = "none";
       $("openaiRow").style.display = "none";
       $("keyHint").style.display = "none";
+      updateKeybarSummary();
     }
   } catch { /* not deployed with functions — user-key mode */ }
 })();
@@ -1151,11 +1208,18 @@ async function extractFileText(file) {
   return file.text(); // .txt / .md
 }
 
-$("jdAttachBtn").addEventListener("click", () => $("jdFile").click());
-$("jdFile").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  e.target.value = ""; // allow re-attaching the same file
+// The JD fold's summary always tells the user its state at a glance,
+// so the section can stay collapsed without hiding information.
+function updateJdSummary() {
+  const has = $("jdText").value.trim().length > 0;
+  $("jdSummary").innerHTML = has
+    ? '📄 Job description — <strong style="color:var(--ok)">loaded ✓</strong> <span class="opt">(click to view or change)</span>'
+    : '📄 Job description <span class="opt">(optional — attach or drop a file to make the email role-specific)</span>';
+}
+
+async function handleJdFile(file) {
   if (!file) return;
+  $("jdFold").open = true;
   $("jdStatus").textContent = `Reading "${file.name}"…`;
   try {
     const text = (await extractFileText(file)).trim();
@@ -1165,10 +1229,31 @@ $("jdFile").addEventListener("change", async (e) => {
   } catch (err) {
     $("jdStatus").textContent = err.message || "Couldn't read that file — paste the text instead.";
   }
+  updateJdSummary();
+}
+
+$("jdAttachBtn").addEventListener("click", () => $("jdFile").click());
+$("jdFile").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  e.target.value = ""; // allow re-attaching the same file
+  handleJdFile(file);
 });
 $("jdClearBtn").addEventListener("click", () => {
   $("jdText").value = "";
   $("jdStatus").textContent = "";
+  updateJdSummary();
+});
+$("jdText").addEventListener("input", updateJdSummary);
+updateJdSummary();
+
+// Drag & drop a JD file anywhere onto the JD section
+const jdFold = $("jdFold");
+jdFold.addEventListener("dragover", (e) => { e.preventDefault(); jdFold.classList.add("dragover"); });
+jdFold.addEventListener("dragleave", () => jdFold.classList.remove("dragover"));
+jdFold.addEventListener("drop", (e) => {
+  e.preventDefault();
+  jdFold.classList.remove("dragover");
+  handleJdFile(e.dataTransfer.files[0]);
 });
 </script>
 </body>
