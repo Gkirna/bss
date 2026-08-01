@@ -35,28 +35,40 @@
     font-size: 16px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* App shell: fills the whole screen, page itself never scrolls (desktop).
+     The two panels scroll internally instead — like a mail client. */
+  html, body { height: 100%; }
   body {
     font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
     background: var(--bg);
     color: var(--ink);
     line-height: 1.55;
-    min-height: 100vh;
-    padding: 24px 16px 64px;
+    height: 100vh;
+    overflow: hidden;
   }
-  .wrap { max-width: 1060px; margin: 0 auto; }
+  .wrap {
+    height: 100%;
+    display: flex; flex-direction: column;
+    padding: 10px 16px 12px; gap: 10px;
+  }
 
-  header { text-align: center; margin-bottom: 18px; }
-  header .brand {
-    font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--gold); font-weight: 700;
+  /* Compact one-line top bar instead of a stacked hero header */
+  header {
+    display: flex; align-items: baseline; gap: 14px;
+    flex: none; text-align: left; padding: 0 4px;
   }
-  header h1 { font-size: 1.7rem; color: var(--accent); margin-top: 4px; }
-  header p  { color: var(--ink-soft); font-size: 0.95rem; margin-top: 4px; }
+  header .brand {
+    font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold); font-weight: 700; white-space: nowrap;
+  }
+  header h1 { font-size: 1.2rem; color: var(--accent); white-space: nowrap; }
+  header p  { margin-left: auto; color: var(--ink-soft); font-size: 0.85rem; }
 
   /* ---------- API key bar ---------- */
   .keybar {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 12px 18px; margin-bottom: 16px;
+    padding: 10px 18px; flex: none;
+    box-shadow: 0 1px 3px rgba(31, 36, 48, 0.05);
   }
   .keybar summary {
     cursor: pointer; font-weight: 600; font-size: 0.9rem; color: var(--accent);
@@ -87,17 +99,22 @@
   .key-status.ok  { color: var(--ok); }
   .key-status.bad { color: var(--danger); }
 
-  /* ---------- layout ---------- */
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
-  /* Output panel follows the user while they scroll the form — generate,
-     refine and copy stay visible at all times (no hunting, no scrolling back) */
-  #outCard {
-    position: sticky; top: 12px;
-    max-height: calc(100vh - 24px); overflow-y: auto;
+  /* ---------- layout: two independently-scrolling panes, full width ---------- */
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(400px, 470px) 1fr; /* compact form, wide output */
+    gap: 14px;
+    flex: 1; min-height: 0; /* lets the panes own the scrolling */
   }
-  @media (max-width: 860px) {
-    .grid { grid-template-columns: 1fr; }
-    #outCard { position: static; max-height: none; }
+
+  /* Mobile / narrow screens: fall back to a normal scrolling page */
+  @media (max-width: 900px) {
+    body { height: auto; overflow: auto; }
+    .wrap { height: auto; }
+    header { flex-wrap: wrap; }
+    header p { margin-left: 0; flex-basis: 100%; }
+    .grid { grid-template-columns: 1fr; flex: none; }
+    .card { overflow: visible; }
   }
 
   /* Collapsible sections keep the form short (progressive disclosure) */
@@ -117,14 +134,19 @@
 
   .card {
     background: var(--card); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 22px;
+    border-radius: var(--radius); padding: 20px 22px;
+    overflow-y: auto; min-height: 0;
+    box-shadow: 0 1px 3px rgba(31, 36, 48, 0.05);
   }
+  .card::-webkit-scrollbar { width: 8px; }
+  .card::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+  .card::-webkit-scrollbar-thumb:hover { background: #cfcdc6; }
   .card h2 {
     font-size: 1.02rem; color: var(--accent); margin-bottom: 16px;
     display: flex; align-items: center; gap: 8px;
   }
 
-  .field { margin-bottom: 14px; }
+  .field { margin-bottom: 12px; }
   .field label { display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 5px; }
   .field label .opt { font-weight: 400; color: var(--ink-soft); font-size: 0.8rem; }
   .field input, .field select, .field textarea {
@@ -132,7 +154,7 @@
     border-radius: 8px; font-size: 0.92rem; font-family: inherit; background: #fff;
     color: var(--ink);
   }
-  .field textarea { resize: vertical; min-height: 84px; }
+  .field textarea { resize: vertical; min-height: 72px; }
   .field input:focus, .field select:focus, .field textarea:focus {
     outline: 2px solid var(--accent-soft); border-color: var(--accent);
   }
@@ -230,7 +252,9 @@
   }
   .toast.show { opacity: 1; }
 
-  footer { text-align: center; margin-top: 30px; font-size: 0.78rem; color: var(--ink-soft); }
+  /* Footer hidden in the app shell (no wasted vertical space); shown on mobile */
+  footer { display: none; text-align: center; font-size: 0.78rem; color: var(--ink-soft); }
+  @media (max-width: 900px) { footer { display: block; margin-top: 20px; } }
 </style>
 </head>
 <body>
@@ -414,7 +438,7 @@
 
   </div>
 
-  <footer>Built for the BSS AI Automation Intern assignment · Powered by Google Gemini</footer>
+  <footer>Built for the BSS AI Automation Intern assignment · Powered by Gemini &amp; OpenAI</footer>
 </div>
 
 <div class="toast" id="toast"></div>
