@@ -255,6 +255,27 @@
 
   /* Telemetry line: model, latency, token usage per draft (LLM-ops) */
   .meta-row { font-size: 0.72rem; color: var(--ink-soft); margin-top: 6px; }
+
+  /* Draft history */
+  .card h2 .hist-btn { margin-left: auto; padding: 6px 12px; font-size: 0.78rem; }
+  .hist-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .hist-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+    margin-bottom: 8px; cursor: pointer; background: #fcfcfb;
+  }
+  .hist-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .hist-main { flex: 1; min-width: 0; }
+  .hist-subj {
+    font-weight: 600; font-size: 0.86rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hist-sub { font-size: 0.74rem; color: var(--ink-soft); }
+  .hist-del {
+    border: none; background: none; color: var(--ink-soft); cursor: pointer;
+    font-size: 0.9rem; padding: 4px 8px; border-radius: 6px;
+  }
+  .hist-del:hover { color: var(--danger); background: #fdecea; }
   .email-body[contenteditable]:focus { outline: 2px solid var(--accent-soft); }
 
   .spinner {
@@ -412,7 +433,20 @@
 
     <!-- ========== OUTPUT (sticky — follows the user while they scroll the form) ========== -->
     <section class="card" id="outCard">
-      <h2>Generated email</h2>
+      <h2>Generated email
+        <button type="button" class="btn btn-ghost btn-small hist-btn" id="historyBtn">History</button>
+      </h2>
+
+      <div id="historyPanel" style="display:none">
+        <div class="hist-top">
+          <strong>Draft history</strong>
+          <button type="button" class="btn btn-ghost btn-small" id="historyClear">Clear all</button>
+        </div>
+        <div id="historyEmpty" class="out-empty" style="padding:20px 12px">
+          No saved drafts yet — every email you generate is kept here automatically.
+        </div>
+        <div id="historyList"></div>
+      </div>
 
       <div class="out-empty" id="outEmpty">
         Your email will appear here.<br>
@@ -1202,6 +1236,8 @@ async function generate(refinement = null) {
     lastEmail = email;
     lastInputs = inputs;
     pushVersion(email);
+    addToHistory(email, inputs);
+    $("historyPanel").style.display = "none"; // fresh draft takes the stage
     if (refinement) refineInput.value = "";
   } catch (err) {
     showError(err.message || "Something went wrong. Please try again.");
@@ -1367,6 +1403,104 @@ outBody.addEventListener("input", () => {
 // Version navigation
 $("verPrev").addEventListener("click", () => showVersion(versionIndex - 1));
 $("verNext").addEventListener("click", () => showVersion(versionIndex + 1));
+
+/* ============================================================================
+   Draft history — every generated email is archived locally (last 50).
+   Click an entry to reload it into the working chain (refine/copy/follow-up
+   all work on it); delete one, or clear all. Nothing leaves the browser.
+   ============================================================================ */
+const HISTORY_STORAGE = "bss_history";
+const HISTORY_MAX = 50;
+
+function getHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_STORAGE) || "[]"); }
+  catch { return []; }
+}
+function setHistory(h) {
+  try { localStorage.setItem(HISTORY_STORAGE, JSON.stringify(h)); }
+  catch { /* storage full — non-fatal */ }
+}
+
+function addToHistory(email, inputs) {
+  const h = getHistory();
+  h.unshift({
+    id: Date.now() + "-" + Math.random().toString(36).slice(2, 7),
+    ts: Date.now(),
+    subject: email.subject,
+    body: email.body,
+    meta: email.meta || null,
+    checks: email.checks || null,
+    // JD text is dropped from the snapshot to keep storage lean
+    inputs: Object.assign({}, inputs, { jd: "" }),
+  });
+  setHistory(h.slice(0, HISTORY_MAX));
+}
+
+function renderHistory() {
+  const list = $("historyList");
+  const h = getHistory();
+  $("historyEmpty").style.display = h.length ? "none" : "block";
+  list.innerHTML = "";
+  for (const item of h) {
+    const row = document.createElement("div");
+    row.className = "hist-item";
+
+    const main = document.createElement("div");
+    main.className = "hist-main";
+    const subj = document.createElement("div");
+    subj.className = "hist-subj";
+    subj.textContent = item.subject;
+    const sub = document.createElement("div");
+    sub.className = "hist-sub";
+    sub.textContent = [
+      item.inputs && item.inputs.recipientName,
+      item.inputs && item.inputs.length,
+      new Date(item.ts).toLocaleString(),
+    ].filter(Boolean).join("  ·  ");
+    main.append(subj, sub);
+
+    const del = document.createElement("button");
+    del.className = "hist-del";
+    del.textContent = "✕";
+    del.title = "Delete this draft";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setHistory(getHistory().filter((x) => x.id !== item.id));
+      renderHistory();
+    });
+
+    row.append(main, del);
+    row.addEventListener("click", () => loadFromHistory(item));
+    list.appendChild(row);
+  }
+}
+
+function loadFromHistory(item) {
+  if (item.inputs) lastInputs = item.inputs;
+  const email = {
+    subject: item.subject, body: item.body,
+    meta: item.meta || undefined, checks: item.checks || undefined,
+  };
+  lastEmail = email;
+  pushVersion(email);
+  toggleHistory(false);
+  toast("Draft loaded from history");
+}
+
+function toggleHistory(show) {
+  const panel = $("historyPanel");
+  const on = show !== undefined ? show : panel.style.display === "none";
+  panel.style.display = on ? "block" : "none";
+  if (on) renderHistory();
+}
+
+$("historyBtn").addEventListener("click", () => toggleHistory());
+$("historyClear").addEventListener("click", () => {
+  if (window.confirm("Delete all saved drafts? This cannot be undone.")) {
+    setHistory([]);
+    renderHistory();
+  }
+});
 
 /* JD attach — supports .txt/.md natively; .pdf and .docx via parser libraries
    loaded from a CDN only when first needed (keeps the page light). Parsing
