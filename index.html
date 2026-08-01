@@ -620,6 +620,10 @@ const outEmpty = $("outEmpty"), outBlock = $("outBlock");
 const outSubject = $("outSubject"), outBody = $("outBody");
 const refineInput = $("refineInput");
 
+// Firefox < 136 doesn't support contenteditable="plaintext-only" and would
+// silently make the email body non-editable — fall back to standard editing.
+if (outBody.contentEditable !== "plaintext-only") outBody.contentEditable = "true";
+
 let selectedLength = "Concise";
 let lastEmail = null;      // { subject, body }
 let lastInputs = null;     // inputs used for the last generation (for regenerate)
@@ -1230,8 +1234,10 @@ async function callGeminiModel(key, model, userPrompt) {
    ============================================================================ */
 async function generate(refinement = null) {
   // For refine/regenerate, reuse the inputs from the last generation so the
-  // user editing the form mid-refine doesn't cause surprises.
-  const inputs = refinement === null ? collectInputs() : lastInputs;
+  // user editing the form mid-refine doesn't cause surprises. Fall back to
+  // the current form if no snapshot exists (e.g. draft restored from an old
+  // storage format) — never crash on a null snapshot.
+  const inputs = refinement === null ? collectInputs() : (lastInputs || collectInputs());
   if (refinement === null && !validate(inputs)) return;
   if (refinement !== null && !lastEmail) return;
 
@@ -1529,6 +1535,8 @@ function toggleHistory(show) {
   const panel = $("historyPanel");
   const on = show !== undefined ? show : panel.style.display === "none";
   panel.style.display = on ? "block" : "none";
+  // Don't show "your email will appear here" underneath an open history list
+  outEmpty.style.display = (on || versions.length) ? "none" : "block";
   if (on) renderHistory();
 }
 

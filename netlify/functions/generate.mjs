@@ -119,7 +119,10 @@ async function callGemini(systemPrompt, userPrompt) {
           contents: [{ role: "user", parts: [{ text: userPrompt }] }],
           generationConfig: {
             temperature: 0.8,
-            maxOutputTokens: 1000, // caps the cost of any single request
+            // Gemini 2.5 models spend "thinking" tokens from this same budget;
+            // 1000 could truncate the JSON mid-answer. 2048 leaves headroom
+            // while still bounding per-request cost.
+            maxOutputTokens: 2048,
             responseMimeType: "application/json",
             responseSchema: {
               type: "OBJECT",
