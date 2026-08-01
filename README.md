@@ -2,7 +2,7 @@
 
 A browser-based tool that turns simple inputs (purpose, recipient, key points, tone, length) into ready-to-send recruiting emails. Built for the Bangalore Strategic Solutions **AI Automation Intern** assignment.
 
-**Live demo:** _<add your GitHub Pages / Netlify link here>_
+**Live demo:** https://gkirna.github.io/bss/
 
 ---
 
