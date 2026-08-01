@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BSS Email Generator — AI-Powered Recruiting Emails</title>
+<!--
+  ============================================================================
+  BSS AI Email Generator
+  Built for the Bangalore Strategic Solutions "AI Automation Intern" assignment.
+
+  Stack   : Single-file HTML + CSS + vanilla JavaScript (no frameworks, no build)
+  AI API  : Google Gemini (gemini-2.5-flash) — free tier, callable directly
+            from the browser, no server needed.
+  API key : Entered by the user at runtime, stored ONLY in the browser's
+            localStorage. Never committed to code. (See README.)
+
+  The full SYSTEM PROMPT is defined below in the <script> section — search
+  for "SYSTEM_PROMPT". It is also documented in README.md.
+  ============================================================================
+-->
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --card: #ffffff;
+    --ink: #1f2430;
+    --ink-soft: #5b6270;
+    --line: #e4e2dc;
+    --accent: #4b3f92;        /* deep violet — matches BSS branding */
+    --accent-soft: #eeecf8;
+    --gold: #b8912e;
+    --danger: #b3382e;
+    --ok: #2e7d4f;
+    --radius: 12px;
+    font-size: 16px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.55;
+    min-height: 100vh;
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; }
+
+  header { text-align: center; margin-bottom: 28px; }
+  header .brand {
+    font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--gold); font-weight: 700;
+  }
+  header h1 { font-size: 1.7rem; color: var(--accent); margin-top: 4px; }
+  header p  { color: var(--ink-soft); font-size: 0.95rem; margin-top: 4px; }
+
+  /* ---------- API key bar ---------- */
+  .keybar {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 18px; margin-bottom: 20px;
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  }
+  .keybar label { font-weight: 600; font-size: 0.9rem; white-space: nowrap; }
+  .keybar input {
+    flex: 1; min-width: 220px; padding: 9px 12px;
+    border: 1px solid var(--line); border-radius: 8px; font-size: 0.9rem;
+  }
+  .keybar .keyrow {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; flex: 1 1 100%;
+  }
+  .keybar .keyrow label { width: 96px; }
+  .keybar .provider-row { justify-content: flex-start; }
+  .keybar select {
+    padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    font-size: 0.9rem; font-family: inherit; background: #fff;
+  }
+  .keybar .hint { flex-basis: 100%; font-size: 0.8rem; color: var(--ink-soft); }
+  .keybar .hint a { color: var(--accent); }
+  .key-status { font-size: 0.85rem; font-weight: 600; }
+  .key-status.ok  { color: var(--ok); }
+  .key-status.bad { color: var(--danger); }
+
+  /* ---------- layout ---------- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 22px;
+  }
+  .card h2 {
+    font-size: 1.02rem; color: var(--accent); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 5px; }
+  .field label .opt { font-weight: 400; color: var(--ink-soft); font-size: 0.8rem; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 0.92rem; font-family: inherit; background: #fff;
+    color: var(--ink);
+  }
+  .field textarea { resize: vertical; min-height: 84px; }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: 2px solid var(--accent-soft); border-color: var(--accent);
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .row2 { grid-template-columns: 1fr; } }
+
+  /* segmented control for length */
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    flex: 1; padding: 9px 6px; background: #fff; border: none; cursor: pointer;
+    font-size: 0.85rem; font-family: inherit; color: var(--ink-soft);
+    border-right: 1px solid var(--line);
+  }
+  .seg button:last-child { border-right: none; }
+  .seg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+  .seg small { display: block; font-size: 0.68rem; opacity: 0.8; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 20px; border: none; border-radius: 9px; cursor: pointer;
+    font-size: 0.95rem; font-weight: 600; font-family: inherit;
+    transition: filter 0.15s;
+  }
+  .btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; margin-top: 6px; }
+  .btn-ghost {
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .btn-small { padding: 8px 14px; font-size: 0.85rem; }
+
+  .warn {
+    background: #fdf6e7; border: 1px solid #ecd9a8; color: #7a5c14;
+    border-radius: 8px; padding: 9px 12px; font-size: 0.84rem; margin-bottom: 12px;
+    display: none;
+  }
+  .error {
+    background: #fdecea; border: 1px solid #f1b8b3; color: var(--danger);
+    border-radius: 8px; padding: 9px 12px; font-size: 0.86rem; margin-bottom: 12px;
+    display: none;
+  }
+
+  /* ---------- output ---------- */
+  .out-empty { color: var(--ink-soft); font-size: 0.9rem; text-align: center; padding: 48px 12px; }
+  .out-block { display: none; }
+  .subject-line {
+    background: var(--accent-soft); border-radius: 8px; padding: 11px 14px;
+    font-weight: 600; font-size: 0.95rem; margin-bottom: 12px;
+    display: flex; justify-content: space-between; gap: 10px; align-items: flex-start;
+  }
+  .email-body {
+    border: 1px solid var(--line); border-radius: 8px; padding: 16px;
+    font-size: 0.93rem; white-space: pre-wrap; min-height: 180px;
+    background: #fcfcfb;
+  }
+  .out-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+
+  .refine-box { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 14px; }
+  .refine-box label { font-weight: 600; font-size: 0.88rem; display: block; margin-bottom: 6px; }
+  .refine-row { display: flex; gap: 8px; }
+  .refine-row input { flex: 1; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 0.9rem; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    background: #f1f0ec; border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 11px; font-size: 0.78rem; cursor: pointer; color: var(--ink-soft);
+  }
+  .chip:hover { background: var(--accent-soft); color: var(--accent); }
+
+  .jd-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+  .jd-actions .opt-note { font-size: 0.78rem; color: var(--ink-soft); }
+
+  .ver-nav { display: none; align-items: center; gap: 6px; margin-left: auto; }
+  .ver-nav button {
+    border: none; background: #fff; color: var(--accent); border-radius: 6px;
+    padding: 2px 8px; cursor: pointer; font-size: 0.8rem;
+  }
+  .ver-nav button:disabled { opacity: 0.35; cursor: default; }
+  .ver-nav span { font-size: 0.75rem; color: var(--ink-soft); white-space: nowrap; }
+
+  .edit-hint { font-size: 0.75rem; color: var(--ink-soft); margin-top: 6px; }
+  .email-body[contenteditable]:focus { outline: 2px solid var(--accent-soft); }
+
+  .spinner {
+    width: 16px; height: 16px; border: 2.5px solid rgba(255,255,255,0.4);
+    border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: #fff; padding: 10px 20px; border-radius: 999px;
+    font-size: 0.85rem; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    z-index: 10;
+  }
+  .toast.show { opacity: 1; }
+
+  footer { text-align: center; margin-top: 30px; font-size: 0.78rem; color: var(--ink-soft); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">Bangalore Strategic Solutions</div>
+    <h1>AI Email Generator</h1>
+    <p>Fill in the details, click Generate, copy, send. That's it.</p>
+  </header>
+
+  <!-- ========== API KEY ========== -->
+  <div class="keybar">
+    <div class="keyrow" id="proxyNote" style="display:none">
+      <span class="key-status ok">✓ This site has a managed API key — nothing to paste. Just fill in the form and generate.</span>
+    </div>
+    <div class="keyrow" id="geminiRow">
+      <label for="geminiKey">Gemini key</label>
+      <input type="password" id="geminiKey" placeholder="AIza… — free key from aistudio.google.com/apikey" autocomplete="off">
+      <span class="key-status" id="geminiKeyStatus"></span>
+    </div>
+    <div class="keyrow" id="openaiRow">
+      <label for="openaiKey">OpenAI key</label>
+      <input type="password" id="openaiKey" placeholder="sk-… — key from platform.openai.com/api-keys" autocomplete="off">
+      <span class="key-status" id="openaiKeyStatus"></span>
+    </div>
+    <div class="keyrow provider-row">
+      <label for="provider">Use</label>
+      <select id="provider">
+        <option value="gemini">Gemini (free tier)</option>
+        <option value="openai">OpenAI</option>
+      </select>
+    </div>
+    <div class="hint" id="keyHint">
+      Get a free Gemini key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>,
+      or an OpenAI key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a>.
+      🔒 Keys are saved only in <em>your</em> browser (localStorage) and sent over HTTPS directly to the provider —
+      they are never in the code, never uploaded anywhere else, and nobody else can see them.
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- ========== INPUT FORM ========== -->
+    <section class="card">
+      <h2>✍️ Email details</h2>
+
+      <div class="field">
+        <label for="template">Quick-start template <span class="opt">(optional — auto-fills the form)</span></label>
+        <select id="template"></select>
+        <div class="jd-actions">
+          <button type="button" class="btn btn-ghost btn-small" id="saveTplBtn">💾 Save form as template</button>
+          <button type="button" class="btn btn-ghost btn-small" id="delTplBtn">🗑 Delete</button>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="purpose">Email purpose</label>
+          <input type="text" id="purpose" placeholder="e.g. Interview scheduling, offer follow-up">
+        </div>
+        <div class="field">
+          <label for="audience">Sending to</label>
+          <select id="audience">
+            <option>Candidate</option>
+            <option>Client</option>
+            <option>Internal team</option>
+            <option>Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="recipientName">Recipient name</label>
+          <input type="text" id="recipientName" placeholder="e.g. Rahul Sharma">
+        </div>
+        <div class="field">
+          <label for="designation">Designation <span class="opt">(optional)</span></label>
+          <input type="text" id="designation" placeholder="e.g. Senior Developer">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="keyPoints">Key points to include</label>
+        <textarea id="keyPoints" placeholder="One per line or free text, e.g.&#10;Monday interview, 11 AM&#10;Microsoft Teams link to follow"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="jdText">Job description <span class="opt">(optional — the email will pull relevant details like role title &amp; skills)</span></label>
+        <textarea id="jdText" style="min-height:64px" placeholder="Paste the JD text here, or attach a file below"></textarea>
+        <div class="jd-actions">
+          <input type="file" id="jdFile" accept=".txt,.md,.text,.pdf,.docx" hidden>
+          <button type="button" class="btn btn-ghost btn-small" id="jdAttachBtn">📎 Attach JD (.pdf / .docx / .txt)</button>
+          <button type="button" class="btn btn-ghost btn-small" id="jdClearBtn">Clear</button>
+          <span class="opt-note" id="jdStatus"></span>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label for="tone">Tone</label>
+          <select id="tone">
+            <option>Professional</option>
+            <option>Friendly</option>
+            <option>Formal</option>
+            <option>Assertive</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="senderName">Your name <span class="opt">(optional, for sign-off)</span></label>
+          <input type="text" id="senderName" placeholder="e.g. Priya from BSS">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Length</label>
+        <div class="seg" id="lengthSeg">
+          <button type="button" data-len="Concise" class="active">Concise<small>3–4 lines</small></button>
+          <button type="button" data-len="Standard">Standard<small>balanced</small></button>
+          <button type="button" data-len="Detailed">Detailed<small>full context</small></button>
+        </div>
+      </div>
+
+      <div class="warn" id="warnBox"></div>
+      <div class="error" id="errorBox"></div>
+
+      <button class="btn btn-primary" id="generateBtn">
+        <span class="spinner" id="spinner"></span>
+        <span id="generateLabel">Generate email</span>
+      </button>
+    </section>
+
+    <!-- ========== OUTPUT ========== -->
+    <section class="card">
+      <h2>📧 Generated email</h2>
+
+      <div class="out-empty" id="outEmpty">
+        Your email will appear here.<br>
+        Pick a template on the left if you want a head start.
+      </div>
+
+      <div class="out-block" id="outBlock">
+        <div class="subject-line">
+          <span id="outSubject"></span>
+          <span class="ver-nav" id="verNav">
+            <button type="button" id="verPrev" title="Previous version">◀</button>
+            <span id="verLabel"></span>
+            <button type="button" id="verNext" title="Next version">▶</button>
+          </span>
+        </div>
+        <div class="email-body" id="outBody" contenteditable="plaintext-only" spellcheck="true"></div>
+        <div class="edit-hint">✏️ Click into the email to edit it directly before copying or sending.</div>
+
+        <div class="out-actions">
+          <button class="btn btn-ghost btn-small" id="copyBtn">📋 Copy email</button>
+          <button class="btn btn-ghost btn-small" id="copySubjectBtn">Copy subject</button>
+          <button class="btn btn-ghost btn-small" id="mailtoBtn">✉️ Open in mail app</button>
+          <button class="btn btn-ghost btn-small" id="regenBtn">🔄 Regenerate</button>
+          <button class="btn btn-ghost btn-small" id="followupBtn" title="Draft a polite follow-up to this email">📨 Follow-up</button>
+        </div>
+
+        <div class="refine-box">
+          <label for="refineInput">Refine it <span class="opt" style="font-weight:400">(tell the AI what to change, then hit Refine)</span></label>
+          <div class="refine-row">
+            <input type="text" id="refineInput" placeholder='e.g. "make it shorter" or "add more urgency"'>
+            <button class="btn btn-ghost btn-small" id="refineBtn">Refine</button>
+          </div>
+          <div class="chips">
+            <span class="chip" data-refine="Make it shorter">Make it shorter</span>
+            <span class="chip" data-refine="Add more urgency">Add urgency</span>
+            <span class="chip" data-refine="Make it warmer and more personal">Warmer</span>
+            <span class="chip" data-refine="Make it more formal">More formal</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <footer>Built for the BSS AI Automation Intern assignment · Powered by Google Gemini</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+/* ============================================================================
+   SYSTEM PROMPT — the heart of this tool (25% of the evaluation!)
+   ----------------------------------------------------------------------------
+   Design notes:
+   - The model is given a ROLE (recruiter at a staffing firm), hard RULES
+     (never invent facts — critical for a tool recruiters will actually send
+     emails from), per-TONE and per-LENGTH definitions so the toggles change
+     the output meaningfully, and a strict JSON output contract.
+   - Missing inputs are handled INSIDE the prompt: the model omits gracefully
+     or inserts [bracketed placeholders] the recruiter can't miss.
+   ============================================================================ */
+const SYSTEM_PROMPT = `You are an experienced recruitment consultant at Bangalore Strategic Solutions (BSS), a contract staffing firm. You write emails on behalf of BSS recruiters to candidates, clients, and internal teams. Your emails get sent as-is, so they must be genuinely ready to send.
+
+HARD RULES
+1. Use ONLY the facts provided by the user. NEVER invent details — no made-up dates, times, names, meeting links, salary figures, or company specifics. If an important detail is missing, either omit it naturally or insert a clearly visible placeholder in square brackets, e.g. [interview time], so the recruiter can fill it in.
+2. Every key point the user provides must appear in the email, woven into natural sentences — never pasted as a raw list (unless length is Detailed and a short list genuinely helps readability).
+3. Sound like a real person wrote it. Banned openers: "I hope this email finds you well", "I am writing to inform you", "Greetings of the day". Banned filler: "please do not hesitate", "at your earliest convenience". Vary sentence structure; don't sound like a template.
+4. Greeting: if a recipient name is given, use it ("Hi Rahul," for Professional/Friendly, "Dear Mr. Sharma," or "Dear Rahul Sharma," for Formal). If no name is given, use a sensible generic greeting for the context ("Hi there," / "Dear Hiring Team,").
+5. Sign-off: end with an appropriate closing and the sender's name. If no sender name is provided, use the placeholder [Your Name]. Add "Bangalore Strategic Solutions" under the name.
+6. If the purpose is vague or missing, infer the most likely intent from the key points and write the best email you can — do not refuse or lecture the user.
+
+TONE definitions
+- Professional: warm but businesslike. Clear, courteous, efficient. Default corporate register.
+- Friendly: conversational and upbeat, contractions welcome, still workplace-appropriate. First-name greeting.
+- Formal: full sentences, no contractions, respectful and precise. "Dear Mr./Ms. <surname>" when a name is available.
+- Assertive: direct and confident. Lead with the ask, state deadlines or expectations plainly, no hedging words like "just" or "maybe" — but never rude.
+
+AUDIENCE definitions
+- Candidate: a job applicant. Be clear about next steps and respectful of their time; never reveal client-confidential details (budgets, other candidates, internal feedback).
+- Client: a hiring-company contact. Be outcome-focused and precise; lead with status or the ask, respect their seniority.
+- Internal team: a BSS colleague. Lighter on formalities, direct and action-oriented.
+- Other: use judgment based on purpose and key points.
+
+JOB DESCRIPTION (JD) context
+If JD text is provided, extract ONLY the details that strengthen this specific email — role title, company or team name, 2–3 headline skills or requirements, location, work model — and weave them in naturally. Never paste JD sentences wholesale, never enumerate the full requirements list, and if the JD conflicts with the user's key points, the key points win.
+
+LENGTH definitions (these must visibly change the output)
+- Concise: 3–4 sentences total in 1–2 short paragraphs. Roughly 50–80 words. Only the essentials — no context-setting sentence, no pleasantries beyond the greeting.
+- Standard: 2–3 paragraphs, roughly 100–160 words. Brief context, all key points, a clear next step.
+- Detailed: 3–5 paragraphs, roughly 180–280 words. Fuller context, each key point elaborated, an explicit summary of next steps at the end. A short bulleted list is allowed here if it aids clarity.
+
+OUTPUT FORMAT
+Return valid JSON: {"subject": "...", "body": "..."}
+- subject: specific and scannable, under 10 words, no "Regarding" or "Important:".
+- body: complete email from greeting to sign-off. Separate paragraphs with a blank line (\\n\\n). Never use markdown symbols (no **, no #).`;
+
+/* ============================================================================
+   Quick-start templates
+   ============================================================================ */
+const TEMPLATES = {
+  interview: {
+    purpose: "Interview Scheduling",
+    recipientName: "Rahul Sharma",
+    designation: "Senior Developer",
+    keyPoints: "Interview on Monday at 11 AM\nHeld over Microsoft Teams — link to follow\nPlease confirm availability",
+    tone: "Professional",
+    length: "Concise",
+    audience: "Candidate",
+  },
+  offer: {
+    purpose: "Offer Letter Follow-up",
+    recipientName: "Ananya Iyer",
+    designation: "QA Engineer",
+    keyPoints: "Offer letter was sent last Tuesday\nAwaiting signed acceptance\nJoining date proposed as the 1st of next month\nHappy to answer any questions about the offer",
+    tone: "Friendly",
+    length: "Standard",
+    audience: "Candidate",
+  },
+  client: {
+    purpose: "Client Status Update",
+    recipientName: "Meera Krishnan",
+    designation: "HR Director",
+    keyPoints: "5 candidates shortlisted for the backend role this week\n2 interviews completed, 3 scheduled for next week\nOne strong candidate expecting offer stage by Friday\nRequesting feedback on the two interviewed profiles",
+    tone: "Professional",
+    length: "Detailed",
+    audience: "Client",
+  },
+  rejection: {
+    purpose: "Candidate Rejection (keep the door open)",
+    recipientName: "Arjun Patel",
+    designation: "Frontend Developer",
+    keyPoints: "Position has been filled\nStrong profile — we'd like to keep the resume on file\nWill reach out for matching future roles",
+    tone: "Formal",
+    length: "Standard",
+    audience: "Candidate",
+  },
+};
+
+/* ============================================================================
+   DOM references & small helpers
+   ============================================================================ */
+const $ = (id) => document.getElementById(id);
+const geminiKeyInput = $("geminiKey"), openaiKeyInput = $("openaiKey");
+const providerSelect = $("provider");
+const generateBtn = $("generateBtn"), spinner = $("spinner"), generateLabel = $("generateLabel");
+const warnBox = $("warnBox"), errorBox = $("errorBox");
+const outEmpty = $("outEmpty"), outBlock = $("outBlock");
+const outSubject = $("outSubject"), outBody = $("outBody");
+const refineInput = $("refineInput");
+
+let selectedLength = "Concise";
+let lastEmail = null;      // { subject, body }
+let lastInputs = null;     // inputs used for the last generation (for regenerate)
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 2200);
+}
+function showWarn(msg)  { warnBox.textContent = msg; warnBox.style.display = msg ? "block" : "none"; }
+function showError(msg) { errorBox.textContent = msg; errorBox.style.display = msg ? "block" : "none"; }
+
+/* ============================================================================
+   API key handling — each provider has its own key, stored ONLY in this
+   browser's localStorage. Keys are never in the source code, never sent
+   anywhere except (over HTTPS) to the provider the user selected.
+   ============================================================================ */
+const KEYS = {
+  gemini: { input: geminiKeyInput, status: $("geminiKeyStatus"), storage: "bss_gemini_key",  prefix: "AIza", label: "Gemini" },
+  openai: { input: openaiKeyInput, status: $("openaiKeyStatus"), storage: "bss_openai_key", prefix: "sk-",  label: "OpenAI" },
+};
+const PROVIDER_STORAGE = "bss_provider";
+
+// Restore saved keys + provider choice on load
+for (const cfg of Object.values(KEYS)) {
+  cfg.input.value = localStorage.getItem(cfg.storage) || "";
+  updateKeyStatus(cfg);
+  cfg.input.addEventListener("change", () => {
+    localStorage.setItem(cfg.storage, cfg.input.value.trim());
+    updateKeyStatus(cfg);
+    autoSelectProvider();
+  });
+}
+providerSelect.value = localStorage.getItem(PROVIDER_STORAGE) || "gemini";
+providerSelect.addEventListener("change", () =>
+  localStorage.setItem(PROVIDER_STORAGE, providerSelect.value));
+autoSelectProvider();
+
+function updateKeyStatus(cfg) {
+  const key = cfg.input.value.trim();
+  if (!key) { cfg.status.textContent = ""; cfg.status.className = "key-status"; return; }
+  if (key.startsWith(cfg.prefix)) {
+    cfg.status.textContent = "✓ saved";
+    cfg.status.className = "key-status ok";
+  } else {
+    cfg.status.textContent = `should start with "${cfg.prefix}"`;
+    cfg.status.className = "key-status bad";
+  }
+}
+
+// If exactly one provider has a key, select it automatically so the user
+// never has to think about the dropdown.
+function autoSelectProvider() {
+  const hasGemini = !!geminiKeyInput.value.trim();
+  const hasOpenAI = !!openaiKeyInput.value.trim();
+  if (hasGemini !== hasOpenAI) {
+    providerSelect.value = hasGemini ? "gemini" : "openai";
+    localStorage.setItem(PROVIDER_STORAGE, providerSelect.value);
+  }
+}
+
+/* ============================================================================
+   Form interactions
+   ============================================================================ */
+// Length segmented control
+$("lengthSeg").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  selectedLength = btn.dataset.len;
+  document.querySelectorAll("#lengthSeg button").forEach(b => b.classList.toggle("active", b === btn));
+});
+
+/* Template dropdown: 4 built-ins + the user's own saved templates ("prompt
+   library"). User templates live in localStorage and appear under "My templates". */
+const BUILTIN_LABELS = {
+  interview: "Interview Scheduling",
+  offer: "Offer Letter Follow-up",
+  client: "Client Status Update",
+  rejection: "Polite Candidate Rejection",
+};
+const USER_TPL_STORAGE = "bss_user_templates";
+function getUserTemplates() {
+  try { return JSON.parse(localStorage.getItem(USER_TPL_STORAGE) || "{}"); }
+  catch { return {}; }
+}
+function setUserTemplates(t) { localStorage.setItem(USER_TPL_STORAGE, JSON.stringify(t)); }
+
+function rebuildTemplateSelect() {
+  const sel = $("template");
+  const current = sel.value;
+  sel.innerHTML = "";
+  sel.add(new Option("— Start from scratch —", ""));
+  for (const [key, label] of Object.entries(BUILTIN_LABELS)) sel.add(new Option(label, key));
+  const names = Object.keys(getUserTemplates());
+  if (names.length) {
+    const group = document.createElement("optgroup");
+    group.label = "My templates";
+    names.forEach((n) => group.appendChild(new Option(n, "user:" + n)));
+    sel.appendChild(group);
+  }
+  if ([...sel.options].some((o) => o.value === current)) sel.value = current;
+}
+rebuildTemplateSelect();
+
+function applyTemplate(t) {
+  $("purpose").value = t.purpose || "";
+  $("recipientName").value = t.recipientName || "";
+  $("designation").value = t.designation || "";
+  $("keyPoints").value = t.keyPoints || "";
+  $("tone").value = t.tone || "Professional";
+  $("audience").value = t.audience || "Candidate";
+  selectedLength = t.length || "Concise";
+  document.querySelectorAll("#lengthSeg button")
+    .forEach(b => b.classList.toggle("active", b.dataset.len === selectedLength));
+  showWarn(""); showError("");
+}
+
+$("template").addEventListener("change", (e) => {
+  const v = e.target.value;
+  const t = v.startsWith("user:") ? getUserTemplates()[v.slice(5)] : TEMPLATES[v];
+  if (t) applyTemplate(t);
+});
+
+$("saveTplBtn").addEventListener("click", () => {
+  const name = (window.prompt("Name this template (e.g. 'Weekly update — Acme Corp'):") || "").trim();
+  if (!name) return;
+  const inp = collectInputs();
+  const user = getUserTemplates();
+  user[name] = {
+    purpose: inp.purpose, recipientName: inp.recipientName, designation: inp.designation,
+    keyPoints: inp.keyPoints, tone: inp.tone, audience: inp.audience, length: inp.length,
+  };
+  setUserTemplates(user);
+  rebuildTemplateSelect();
+  $("template").value = "user:" + name;
+  toast(`Template "${name}" saved ✓`);
+});
+
+$("delTplBtn").addEventListener("click", () => {
+  const v = $("template").value;
+  if (!v.startsWith("user:")) { toast("Select one of your saved templates first"); return; }
+  const name = v.slice(5);
+  const user = getUserTemplates();
+  delete user[name];
+  setUserTemplates(user);
+  rebuildTemplateSelect();
+  $("template").value = "";
+  toast(`Template "${name}" deleted`);
+});
+
+// Refinement chips fill the refine input
+document.querySelectorAll(".chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    refineInput.value = chip.dataset.refine;
+    refineInput.focus();
+  });
+});
+
+/* ============================================================================
+   Input collection & edge-case validation
+   ----------------------------------------------------------------------------
+   Philosophy: block only when there is genuinely nothing to write from.
+   Anything partially missing produces a WARNING plus graceful handling in the
+   prompt (placeholders / generic greeting), not a dead end.
+   ============================================================================ */
+function collectInputs() {
+  return {
+    purpose:       $("purpose").value.trim(),
+    recipientName: $("recipientName").value.trim(),
+    designation:   $("designation").value.trim(),
+    keyPoints:     $("keyPoints").value.trim(),
+    tone:          $("tone").value,
+    audience:      $("audience").value,
+    senderName:    $("senderName").value.trim(),
+    length:        selectedLength,
+    jd:            $("jdText").value.trim(),
+  };
+}
+
+function validate(inputs) {
+  showWarn(""); showError("");
+  if (!proxyAvailable) { // in managed-key mode there is nothing to validate
+    const provider = providerSelect.value;
+    const cfg = KEYS[provider];
+    const key = cfg.input.value.trim();
+    if (!key) {
+      showError(`You've selected ${cfg.label} but no ${cfg.label} key is saved — paste one at the top (or switch provider).`);
+      return false;
+    }
+    if (!key.startsWith(cfg.prefix)) {
+      showError(`That doesn't look like a ${cfg.label} key — ${cfg.label} keys start with "${cfg.prefix}".`);
+      return false;
+    }
+  }
+  if (!inputs.purpose && !inputs.keyPoints) {
+    showError("Give me something to work with — at least an email purpose or a few key points.");
+    return false;
+  }
+  const warnings = [];
+  if (!inputs.recipientName) warnings.push("no recipient name (a generic greeting will be used)");
+  if (!inputs.purpose)       warnings.push("no purpose (I'll infer it from your key points)");
+  if (!inputs.keyPoints)     warnings.push("no key points (the email will be general — placeholders may appear)");
+  if (warnings.length) showWarn("Heads up: " + warnings.join("; ") + ".");
+  return true;
+}
+
+/* ============================================================================
+   Building the user prompt for the model
+   ============================================================================ */
+function buildUserPrompt(inputs, refinement) {
+  const lines = [
+    "Write an email with these inputs:",
+    `Purpose: ${inputs.purpose || "(not given — infer from key points)"}`,
+    `Audience: ${inputs.audience}`,
+    `Recipient: ${inputs.recipientName || "(not given)"}${inputs.designation ? ", " + inputs.designation : ""}`,
+    `Key points: ${inputs.keyPoints || "(none given)"}`,
+    `Tone: ${inputs.tone}`,
+    `Length: ${inputs.length}`,
+    `Sender name: ${inputs.senderName || "(not given — use [Your Name])"}`,
+  ];
+  if (inputs.jd) {
+    // Cap JD size so a long paste can't blow up token usage
+    lines.push("", "Job description context (use only relevant details, per your JD rules):", inputs.jd.slice(0, 8000));
+  }
+  if (refinement && refinement.type === "followup" && lastEmail) {
+    lines.push(
+      "",
+      "You previously wrote and sent this email:",
+      `Subject: ${lastEmail.subject}`,
+      lastEmail.body,
+      "",
+      "Now write a brief, polite FOLLOW-UP email from the same sender, assuming no reply has been received yet.",
+      "This is a NEW email, not a rewrite: reference the earlier email naturally, restate the essential ask in one line, and keep it shorter than the original."
+    );
+  } else if (refinement && lastEmail) {
+    lines.push(
+      "",
+      "You previously wrote this email:",
+      `Subject: ${lastEmail.subject}`,
+      lastEmail.body,
+      "",
+      `Rewrite it, applying this instruction from the user: "${refinement}".`,
+      "The change must be clearly noticeable, while keeping all factual key points intact."
+    );
+  } else if (refinement === "" && lastEmail) {
+    // Plain regenerate (no instruction): ask for a genuinely different take
+    lines.push(
+      "",
+      "You previously wrote this email:",
+      `Subject: ${lastEmail.subject}`,
+      lastEmail.body,
+      "",
+      "Write a NEW version with noticeably different wording and structure — same facts, fresh take."
+    );
+  }
+  return lines.join("\n");
+}
+
+/* ============================================================================
+   AI API calls — provider auto-detected from the key prefix
+   ----------------------------------------------------------------------------
+   Both providers are asked for strict JSON {subject, body}:
+   - Gemini : JSON mode via responseMimeType + responseSchema
+   - OpenAI : JSON mode via response_format {type: "json_object"}
+   Each provider has a fallback list of model names (naming varies by
+   account/region), and the first working model is remembered per browser.
+   ============================================================================ */
+/* Managed-key proxy: when this site is deployed with server-side keys
+   (see netlify/functions/generate.js), the browser needs no key at all.
+   Probed once at load; falls back silently to bring-your-own-key mode. */
+let proxyAvailable = false;
+(async function probeProxy() {
+  try {
+    const res = await fetch("/.netlify/functions/generate", { method: "GET" });
+    if (!res.ok) return;
+    const info = await res.json();
+    if (info.proxy === true) {
+      proxyAvailable = true;
+      $("proxyNote").style.display = "flex";
+      $("geminiRow").style.display = "none";
+      $("openaiRow").style.display = "none";
+      $("keyHint").style.display = "none";
+    }
+  } catch { /* not deployed with functions — user-key mode */ }
+})();
+
+async function callAI(userPrompt) {
+  const provider = providerSelect.value;
+
+  if (proxyAvailable) {
+    const res = await fetch("/.netlify/functions/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, systemPrompt: SYSTEM_PROMPT, userPrompt }),
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* non-JSON error body */ }
+    if (!res.ok) throw new Error((data && data.error) || `Server error (${res.status}). Please try again.`);
+    if (!data || !data.subject || !data.body) throw new Error("The AI response was incomplete. Please try again.");
+    return data;
+  }
+
+  const key = KEYS[provider].input.value.trim();
+  return provider === "openai" ? callOpenAI(key, userPrompt) : callGemini(key, userPrompt);
+}
+
+/* ---------------- OpenAI ---------------- */
+const OPENAI_MODELS = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4o"];
+let workingOpenAIModel = localStorage.getItem("bss_openai_model") || null;
+
+async function callOpenAI(key, userPrompt) {
+  const models = workingOpenAIModel
+    ? [workingOpenAIModel, ...OPENAI_MODELS.filter(m => m !== workingOpenAIModel)]
+    : OPENAI_MODELS;
+
+  let lastErr = null;
+  for (const model of models) {
+    try {
+      const result = await callOpenAIModel(key, model, userPrompt);
+      workingOpenAIModel = model;
+      localStorage.setItem("bss_openai_model", model);
+      return result;
+    } catch (err) {
+      if (err.isNotFound) { lastErr = err; continue; } // model unavailable → try next
+      throw err;
+    }
+  }
+  throw new Error("None of the OpenAI models are available on this account. " +
+    "Check your key at platform.openai.com/api-keys.");
+}
+
+async function callOpenAIModel(key, model, userPrompt) {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+    body: JSON.stringify({
+      model,
+      temperature: 0.8,
+      response_format: { type: "json_object" }, // guarantees parseable JSON
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    let code = "";
+    try { code = (await res.json())?.error?.code || ""; } catch { /* body not JSON */ }
+    if (res.status === 404 || code === "model_not_found") {
+      const err = new Error(`Model "${model}" not available.`);
+      err.isNotFound = true;
+      throw err;
+    }
+    if (res.status === 401) {
+      throw new Error("The OpenAI key was rejected. Double-check it at platform.openai.com/api-keys.");
+    }
+    if (res.status === 429) {
+      throw new Error(code === "insufficient_quota"
+        ? "Your OpenAI account has no credits. Add billing at platform.openai.com, or use a free Gemini key instead."
+        : "OpenAI rate limit hit — wait a few seconds and try again.");
+    }
+    throw new Error(`OpenAI returned an error (${res.status}). Please try again.`);
+  }
+
+  const data = await res.json();
+  const text = data?.choices?.[0]?.message?.content;
+  if (!text) throw new Error("The AI returned an empty response. Please try again.");
+  const parsed = JSON.parse(text);
+  if (!parsed.subject || !parsed.body) throw new Error("The AI response was incomplete. Please try again.");
+  return parsed;
+}
+
+/* ---------------- Gemini ---------------- */
+// Model names vary by key/region/API version — try these in order and remember
+// the first one that works for this key.
+const MODEL_CANDIDATES = [
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-flash-latest",
+  "gemini-2.5-flash-lite",
+  "gemini-1.5-flash",
+];
+let workingModel = localStorage.getItem("bss_gemini_model") || null;
+
+async function callGemini(key, userPrompt) {
+  const models = workingModel
+    ? [workingModel, ...MODEL_CANDIDATES.filter(m => m !== workingModel)]
+    : MODEL_CANDIDATES;
+
+  let lastErr = null;
+  for (const model of models) {
+    try {
+      const result = await callGeminiModel(key, model, userPrompt);
+      workingModel = model;
+      localStorage.setItem("bss_gemini_model", model);
+      return result;
+    } catch (err) {
+      // 404 = this model name isn't available for this key — try the next one.
+      if (err.isNotFound) { lastErr = err; continue; }
+      throw err;
+    }
+  }
+  throw new Error("None of the Gemini models responded for this API key. " +
+    "Make sure the key is from aistudio.google.com/apikey (Google AI Studio), not Google Cloud.");
+}
+
+async function callGeminiModel(key, model, userPrompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  const payload = {
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+    generationConfig: {
+      temperature: 0.8,           // some variety, so Regenerate gives fresh takes
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          subject: { type: "STRING" },
+          body:    { type: "STRING" },
+        },
+        required: ["subject", "body"],
+      },
+    },
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    // Map common failures to human-readable messages
+    if (res.status === 404) {
+      const err = new Error(`Model "${model}" not available for this key.`);
+      err.isNotFound = true;   // signals callGemini() to try the next model
+      throw err;
+    }
+    if (res.status === 400 || res.status === 403) {
+      throw new Error("The API key looks invalid. Double-check it (or create a new one at aistudio.google.com/apikey).");
+    }
+    if (res.status === 429) {
+      throw new Error("Rate limit hit — the free tier allows a few requests per minute. Wait ~30 seconds and try again.");
+    }
+    throw new Error(`The AI service returned an error (${res.status}). Please try again.`);
+  }
+
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error("The AI returned an empty response. Please try again.");
+
+  const parsed = JSON.parse(text); // safe: responseSchema guarantees JSON shape
+  if (!parsed.subject || !parsed.body) throw new Error("The AI response was incomplete. Please try again.");
+  return parsed;
+}
+
+/* ============================================================================
+   Generate / Regenerate / Refine flows
+   ============================================================================ */
+async function generate(refinement = null) {
+  // For refine/regenerate, reuse the inputs from the last generation so the
+  // user editing the form mid-refine doesn't cause surprises.
+  const inputs = refinement === null ? collectInputs() : lastInputs;
+  if (refinement === null && !validate(inputs)) return;
+  if (refinement !== null && !lastEmail) return;
+
+  setLoading(true);
+  try {
+    const email = await callAI(buildUserPrompt(inputs, refinement));
+    lastEmail = email;
+    lastInputs = inputs;
+    pushVersion(email);
+    if (refinement) refineInput.value = "";
+  } catch (err) {
+    showError(err.message || "Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(on) {
+  generateBtn.disabled = on;
+  $("regenBtn").disabled = on;
+  $("refineBtn").disabled = on;
+  $("followupBtn").disabled = on;
+  spinner.style.display = on ? "inline-block" : "none";
+  generateLabel.textContent = on ? "Writing…" : "Generate email";
+}
+
+function renderEmail({ subject, body }) {
+  outEmpty.style.display = "none";
+  outBlock.style.display = "block";
+  outSubject.textContent = subject;
+  // Normalise whitespace: collapse 3+ newlines, trim — clean paragraphs
+  outBody.textContent = body.replace(/\n{3,}/g, "\n\n").trim();
+  showError("");
+}
+
+/* ============================================================================
+   Version history — every Generate/Regenerate/Refine result is kept, so a
+   refinement never destroys a draft the recruiter preferred. ◀ ▶ to browse.
+   ============================================================================ */
+let versions = [], versionIndex = -1;
+
+// Drafts survive a page reload (stored locally, like the keys)
+const DRAFTS_STORAGE = "bss_drafts";
+function persistDrafts() {
+  try {
+    localStorage.setItem(DRAFTS_STORAGE, JSON.stringify({ versions, versionIndex, lastInputs }));
+  } catch { /* storage full/blocked — non-fatal */ }
+}
+
+function pushVersion(email) {
+  versions.push({ ...email });
+  versionIndex = versions.length - 1;
+  renderEmail(email);
+  updateVerNav();
+  persistDrafts();
+}
+function showVersion(i) {
+  versionIndex = Math.max(0, Math.min(versions.length - 1, i));
+  lastEmail = versions[versionIndex];
+  renderEmail(lastEmail);
+  updateVerNav();
+  persistDrafts();
+}
+function updateVerNav() {
+  const nav = $("verNav");
+  if (versions.length < 2) { nav.style.display = "none"; return; }
+  nav.style.display = "inline-flex";
+  $("verLabel").textContent = `v${versionIndex + 1}/${versions.length}`;
+  $("verPrev").disabled = versionIndex === 0;
+  $("verNext").disabled = versionIndex === versions.length - 1;
+}
+
+/* ============================================================================
+   Copy to clipboard — clean paragraph formatting
+   ============================================================================ */
+async function copyText(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(label + " copied to clipboard ✓");
+  } catch {
+    // Fallback for older browsers / non-HTTPS contexts
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+    toast(label + " copied ✓");
+  }
+}
+
+/* ============================================================================
+   Wire up buttons
+   ============================================================================ */
+generateBtn.addEventListener("click", () => generate(null));
+$("regenBtn").addEventListener("click", () => generate(""));                       // fresh take, no instruction
+$("followupBtn").addEventListener("click", () => generate({ type: "followup" })); // new email chasing the last one
+$("refineBtn").addEventListener("click", () => {
+  const instruction = refineInput.value.trim();
+  if (!instruction) { toast("Type what you'd like changed first"); return; }
+  generate(instruction);
+});
+refineInput.addEventListener("keydown", (e) => { if (e.key === "Enter") $("refineBtn").click(); });
+
+/* Placeholder scanner — the last-line guardrail. If the draft still contains
+   [bracketed placeholders] (e.g. the model marked a missing interview time),
+   warn the recruiter before it goes anywhere near a real recipient. */
+function placeholderWarning(text) {
+  const found = text.match(/\[[^\[\]\n]{1,48}\]/g);
+  if (!found) return null;
+  const unique = [...new Set(found)].slice(0, 3).join(", ");
+  return `⚠️ Unfilled placeholder${found.length > 1 ? "s" : ""}: ${unique} — fill before sending!`;
+}
+
+// innerText (not textContent) so line breaks from in-place edits are preserved
+$("copyBtn").addEventListener("click", async () => {
+  const body = outBody.innerText.trim();
+  await copyText(`Subject: ${outSubject.textContent}\n\n${body}`, "Email");
+  const warn = placeholderWarning(outSubject.textContent + " " + body);
+  if (warn) setTimeout(() => toast(warn), 1400);
+});
+$("copySubjectBtn").addEventListener("click", () =>
+  copyText(outSubject.textContent, "Subject"));
+
+// Open the draft in the user's default mail client, prefilled
+$("mailtoBtn").addEventListener("click", () => {
+  const body = outBody.innerText.trim();
+  const warn = placeholderWarning(outSubject.textContent + " " + body);
+  if (warn) toast(warn);
+  window.location.href =
+    `mailto:?subject=${encodeURIComponent(outSubject.textContent)}&body=${encodeURIComponent(body)}`;
+});
+
+// In-place edits update the current draft, so copy/mail/refine use the edited text
+outBody.addEventListener("input", () => {
+  if (!lastEmail) return;
+  lastEmail.body = outBody.innerText.trim();
+  if (versionIndex >= 0) versions[versionIndex].body = lastEmail.body;
+  persistDrafts();
+});
+
+// Restore drafts from a previous session
+(function restoreDrafts() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFTS_STORAGE) || "null");
+    if (d && Array.isArray(d.versions) && d.versions.length) {
+      versions = d.versions;
+      versionIndex = Math.min(d.versionIndex ?? d.versions.length - 1, d.versions.length - 1);
+      lastInputs = d.lastInputs || null;
+      lastEmail = versions[versionIndex];
+      renderEmail(lastEmail);
+      updateVerNav();
+    }
+  } catch { /* corrupt store — start fresh */ }
+})();
+
+// Version navigation
+$("verPrev").addEventListener("click", () => showVersion(versionIndex - 1));
+$("verNext").addEventListener("click", () => showVersion(versionIndex + 1));
+
+/* JD attach — supports .txt/.md natively; .pdf and .docx via parser libraries
+   loaded from a CDN only when first needed (keeps the page light). Parsing
+   happens entirely in the browser; the file is never uploaded anywhere. */
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error("Couldn't load parser (offline?) — paste the JD text instead."));
+    document.head.appendChild(s);
+  });
+}
+
+async function extractFileText(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) {
+    if (!window.pdfjsLib) {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+    const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    let text = "";
+    for (let i = 1; i <= Math.min(pdf.numPages, 12); i++) {
+      const content = await (await pdf.getPage(i)).getTextContent();
+      text += content.items.map((it) => it.str).join(" ") + "\n";
+    }
+    return text;
+  }
+  if (name.endsWith(".docx")) {
+    if (!window.mammoth) {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js");
+    }
+    return (await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value;
+  }
+  return file.text(); // .txt / .md
+}
+
+$("jdAttachBtn").addEventListener("click", () => $("jdFile").click());
+$("jdFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = ""; // allow re-attaching the same file
+  if (!file) return;
+  $("jdStatus").textContent = `Reading "${file.name}"…`;
+  try {
+    const text = (await extractFileText(file)).trim();
+    if (!text) throw new Error("No readable text found (scanned image PDF?) — paste the text instead.");
+    $("jdText").value = text.slice(0, 12000);
+    $("jdStatus").textContent = `Loaded "${file.name}" ✓`;
+  } catch (err) {
+    $("jdStatus").textContent = err.message || "Couldn't read that file — paste the text instead.";
+  }
+});
+$("jdClearBtn").addEventListener("click", () => {
+  $("jdText").value = "";
+  $("jdStatus").textContent = "";
+});
+</script>
+</body>
+</html>

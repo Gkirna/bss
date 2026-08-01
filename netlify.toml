@@ -1,0 +1,6 @@
+# Netlify configuration — static site + managed-key proxy function
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
