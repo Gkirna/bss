@@ -53,10 +53,22 @@ export default async (req, context) => {
     );
   }
 
+  // Only accept requests originating from this site itself. Browsers always
+  // send an Origin header on cross- and same-origin POSTs; direct curl/scripts
+  // without a matching Origin are rejected. (Not unforgeable server-to-server,
+  // but it blocks other websites and casual scripts from farming the endpoint.)
+  const selfHost = new URL(req.url).host;
+  const origin = req.headers.get("origin") || "";
+  let originHost = "";
+  try { originHost = new URL(origin).host; } catch { /* missing/invalid */ }
+  if (originHost !== selfHost) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   let body;
   try { body = await req.json(); } catch { body = null; }
   const { provider = "gemini", systemPrompt, userPrompt } = body || {};
-  if (!systemPrompt || !userPrompt || userPrompt.length > 20_000) {
+  if (!systemPrompt || !userPrompt || userPrompt.length > 20_000 || systemPrompt.length > 20_000) {
     return Response.json({ error: "Bad request" }, { status: 400 });
   }
 
@@ -90,6 +102,7 @@ async function callGemini(systemPrompt, userPrompt) {
           contents: [{ role: "user", parts: [{ text: userPrompt }] }],
           generationConfig: {
             temperature: 0.8,
+            maxOutputTokens: 1000, // caps the cost of any single request
             responseMimeType: "application/json",
             responseSchema: {
               type: "OBJECT",
@@ -122,6 +135,7 @@ async function callOpenAI(systemPrompt, userPrompt) {
       body: JSON.stringify({
         model,
         temperature: 0.8,
+        max_tokens: 1000, // caps the cost of any single request
         response_format: { type: "json_object" },
         messages: [
           { role: "system", content: systemPrompt },
