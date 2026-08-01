@@ -52,17 +52,25 @@
     padding: 10px 16px 12px; gap: 10px;
   }
 
-  /* Compact one-line top bar instead of a stacked hero header */
+  /* App bar: white card strip, vertically centered, brand | title | tagline */
   header {
-    display: flex; align-items: baseline; gap: 14px;
-    flex: none; text-align: left; padding: 0 4px;
+    display: flex; align-items: center; gap: 16px;
+    flex: none; text-align: left;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px 20px;
+    box-shadow: 0 1px 3px rgba(31, 36, 48, 0.05);
   }
   header .brand {
-    font-size: 0.7rem; letter-spacing: 0.14em; text-transform: uppercase;
+    font-size: 0.68rem; letter-spacing: 0.14em; text-transform: uppercase;
     color: var(--gold); font-weight: 700; white-space: nowrap;
+    padding-right: 16px; border-right: 1px solid var(--line);
+    line-height: 1.2;
   }
-  header h1 { font-size: 1.2rem; color: var(--accent); white-space: nowrap; }
-  header p  { margin-left: auto; color: var(--ink-soft); font-size: 0.85rem; }
+  header h1 {
+    font-size: 1.05rem; color: var(--accent); white-space: nowrap;
+    font-weight: 600; line-height: 1.2;
+  }
+  header p { margin-left: auto; color: var(--ink-soft); font-size: 0.82rem; }
 
   /* ---------- API key bar ---------- */
   .keybar {
@@ -277,7 +285,7 @@
 
   <!-- ========== API KEY (collapsible — opens automatically when no key is set) ========== -->
   <details class="keybar" id="keybar">
-    <summary id="keybarSummary">🔑 API keys</summary>
+    <summary id="keybarSummary">API access</summary>
     <div class="keyrow" id="proxyNote" style="display:none">
       <span class="key-status ok">✓ This site has a managed API key — nothing to paste. Just fill in the form and generate.</span>
     </div>
@@ -301,7 +309,7 @@
     <div class="hint" id="keyHint">
       Get a free Gemini key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>,
       or an OpenAI key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com/api-keys</a>.
-      🔒 Keys are saved only in <em>your</em> browser (localStorage) and sent over HTTPS directly to the provider —
+      Keys are saved only in <em>your</em> browser (localStorage) and sent over HTTPS directly to the provider —
       they are never in the code, never uploaded anywhere else, and nobody else can see them.
     </div>
   </details>
@@ -310,14 +318,14 @@
 
     <!-- ========== INPUT FORM ========== -->
     <section class="card">
-      <h2>✍️ Email details</h2>
+      <h2>Email details</h2>
 
       <div class="field">
         <label for="template">Quick-start template <span class="opt">(optional — auto-fills the form)</span></label>
         <select id="template"></select>
         <div class="jd-actions">
-          <button type="button" class="btn btn-ghost btn-small" id="saveTplBtn">💾 Save form as template</button>
-          <button type="button" class="btn btn-ghost btn-small" id="delTplBtn">🗑 Delete</button>
+          <button type="button" class="btn btn-ghost btn-small" id="saveTplBtn">Save as template</button>
+          <button type="button" class="btn btn-ghost btn-small" id="delTplBtn">Delete</button>
         </div>
       </div>
 
@@ -354,12 +362,12 @@
       </div>
 
       <details class="field fold" id="jdFold">
-        <summary id="jdSummary">📄 Job description <span class="opt">(optional — attach or drop a file to make the email role-specific)</span></summary>
+        <summary id="jdSummary">Job description <span class="opt">(optional — attach or drop a file to make the email role-specific)</span></summary>
         <div class="fold-body">
           <textarea id="jdText" style="min-height:64px" placeholder="Paste the JD text, drag &amp; drop a .pdf/.docx/.txt onto this section, or attach below"></textarea>
           <div class="jd-actions">
             <input type="file" id="jdFile" accept=".txt,.md,.text,.pdf,.docx" hidden>
-            <button type="button" class="btn btn-ghost btn-small" id="jdAttachBtn">📎 Attach JD (.pdf / .docx / .txt)</button>
+            <button type="button" class="btn btn-ghost btn-small" id="jdAttachBtn">Attach file (.pdf / .docx / .txt)</button>
             <button type="button" class="btn btn-ghost btn-small" id="jdClearBtn">Clear</button>
             <span class="opt-note" id="jdStatus"></span>
           </div>
@@ -402,7 +410,7 @@
 
     <!-- ========== OUTPUT (sticky — follows the user while they scroll the form) ========== -->
     <section class="card" id="outCard">
-      <h2>📧 Generated email</h2>
+      <h2>Generated email</h2>
 
       <div class="out-empty" id="outEmpty">
         Your email will appear here.<br>
@@ -419,15 +427,15 @@
           </span>
         </div>
         <div class="email-body" id="outBody" contenteditable="plaintext-only" spellcheck="true"></div>
-        <div class="edit-hint">✏️ Click into the email to edit it directly before copying or sending.</div>
+        <div class="edit-hint">Tip: click into the email to edit it directly before copying or sending.</div>
         <div class="guard-row" id="guardRow" style="display:none"></div>
 
         <div class="out-actions">
-          <button class="btn btn-ghost btn-small" id="copyBtn">📋 Copy email</button>
+          <button class="btn btn-ghost btn-small" id="copyBtn">Copy email</button>
           <button class="btn btn-ghost btn-small" id="copySubjectBtn">Copy subject</button>
-          <button class="btn btn-ghost btn-small" id="mailtoBtn">✉️ Open in mail app</button>
-          <button class="btn btn-ghost btn-small" id="regenBtn">🔄 Regenerate</button>
-          <button class="btn btn-ghost btn-small" id="followupBtn" title="Draft a polite follow-up to this email">📨 Follow-up</button>
+          <button class="btn btn-ghost btn-small" id="mailtoBtn">Open in mail app</button>
+          <button class="btn btn-ghost btn-small" id="regenBtn">Regenerate</button>
+          <button class="btn btn-ghost btn-small" id="followupBtn" title="Draft a polite follow-up to this email">Follow-up</button>
         </div>
 
         <div class="refine-box">
@@ -626,17 +634,13 @@ function autoSelectProvider() {
 /* The key bar is collapsed to one line once set up; its summary always shows
    the current state. It opens itself only when the user still needs to act. */
 function updateKeybarSummary() {
+  if (proxyAvailable) return; // bar is hidden entirely in managed-key mode
   const s = $("keybarSummary");
-  if (proxyAvailable) {
-    s.textContent = "🔑 API — ✓ managed key active, nothing to paste";
-    $("keybar").open = false;
-    return;
-  }
   const cfg = KEYS[providerSelect.value];
   if (cfg.input.value.trim()) {
-    s.textContent = `🔑 API keys — ✓ ${cfg.label} active`;
+    s.textContent = `API access — ${cfg.label} connected`;
   } else {
-    s.textContent = "🔑 API keys — paste a free key to start";
+    s.textContent = "API access — paste a free key to start";
     $("keybar").open = true;
   }
 }
@@ -879,7 +883,7 @@ function renderGuardrailsUI(email) {
     s.textContent = text;
     row.appendChild(s);
   };
-  if (email.corrected) add("🛠 auto-corrected", "info");
+  if (email.corrected) add("auto-corrected", "info");
   for (const c of email.checks) add((c.ok ? "✓ " : "⚠ ") + c.label, c.ok ? "" : "warn");
 }
 
@@ -954,11 +958,11 @@ function buildUserPrompt(inputs, refinement) {
     const info = await res.json();
     if (info.proxy === true) {
       proxyAvailable = true;
-      $("proxyNote").style.display = "flex";
-      $("geminiRow").style.display = "none";
-      $("openaiRow").style.display = "none";
-      $("keyHint").style.display = "none";
-      updateKeybarSummary();
+      // Managed-key mode: the entire API section disappears — a recruiter
+      // just fills the form. Provider follows what the server has configured.
+      $("keybar").style.display = "none";
+      if (info.openai) providerSelect.value = "openai";
+      else if (info.gemini) providerSelect.value = "gemini";
     }
   } catch { /* not deployed with functions — user-key mode */ }
 })();
@@ -1285,7 +1289,7 @@ function placeholderWarning(text) {
   const found = text.match(/\[[^\[\]\n]{1,48}\]/g);
   if (!found) return null;
   const unique = [...new Set(found)].slice(0, 3).join(", ");
-  return `⚠️ Unfilled placeholder${found.length > 1 ? "s" : ""}: ${unique} — fill before sending!`;
+  return `Unfilled placeholder${found.length > 1 ? "s" : ""}: ${unique} — fill before sending!`;
 }
 
 // innerText (not textContent) so line breaks from in-place edits are preserved
@@ -1377,8 +1381,8 @@ async function extractFileText(file) {
 function updateJdSummary() {
   const has = $("jdText").value.trim().length > 0;
   $("jdSummary").innerHTML = has
-    ? '📄 Job description — <strong style="color:var(--ok)">loaded ✓</strong> <span class="opt">(click to view or change)</span>'
-    : '📄 Job description <span class="opt">(optional — attach or drop a file to make the email role-specific)</span>';
+    ? 'Job description — <strong style="color:var(--ok)">loaded ✓</strong> <span class="opt">(click to view or change)</span>'
+    : 'Job description <span class="opt">(optional — attach or drop a file to make the email role-specific)</span>';
 }
 
 async function handleJdFile(file) {
