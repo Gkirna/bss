@@ -234,6 +234,14 @@
   .jd-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
   .jd-actions .opt-note { font-size: 0.78rem; color: var(--ink-soft); }
 
+  /* Inline template-naming row (replaces the native prompt() dialog) */
+  .tpl-save-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .tpl-save-row input {
+    flex: 1; min-width: 0; padding: 8px 12px;
+    border: 1px solid var(--accent); border-radius: 8px;
+    font-size: 0.88rem; font-family: inherit;
+  }
+
   .ver-nav { display: none; align-items: center; gap: 6px; margin-left: auto; }
   .ver-nav button {
     border: none; background: #fff; color: var(--accent); border-radius: 6px;
@@ -349,6 +357,11 @@
         <div class="jd-actions">
           <button type="button" class="btn btn-ghost btn-small" id="saveTplBtn">Save as template</button>
           <button type="button" class="btn btn-ghost btn-small" id="delTplBtn">Delete</button>
+        </div>
+        <div class="tpl-save-row" id="tplSaveRow" style="display:none">
+          <input type="text" id="tplNameInput" placeholder="Template name, e.g. Weekly update — Acme" maxlength="60">
+          <button type="button" class="btn btn-ghost btn-small" id="tplSaveConfirm">Save</button>
+          <button type="button" class="btn btn-ghost btn-small" id="tplSaveCancel">Cancel</button>
         </div>
       </div>
 
@@ -749,11 +762,29 @@ $("template").addEventListener("change", (e) => {
   if (t) applyTemplate(t);
 });
 
+/* "Save as template" opens an inline naming row (no native prompt() dialog —
+   those look unprofessional and some browsers suppress them). Saving with an
+   existing name updates that template. Enter saves, Cancel closes. */
 $("saveTplBtn").addEventListener("click", () => {
-  const name = (window.prompt("Name this template (e.g. 'Weekly update — Acme Corp'):") || "").trim();
-  if (!name) return;
+  const row = $("tplSaveRow");
+  if (row.style.display !== "none") { row.style.display = "none"; return; } // toggle off
+  row.style.display = "flex";
+  const v = $("template").value;
+  const suggested = v.startsWith("user:")
+    ? v.slice(5)                                   // editing a saved template → keep its name
+    : ($("purpose").value.trim() || "My template"); // otherwise suggest from purpose
+  const nameInput = $("tplNameInput");
+  nameInput.value = suggested;
+  nameInput.focus();
+  nameInput.select();
+});
+
+function saveTemplateFromForm() {
+  const name = $("tplNameInput").value.trim();
+  if (!name) { toast("Give the template a name first"); $("tplNameInput").focus(); return; }
   const inp = collectInputs();
   const user = getUserTemplates();
+  const existed = Object.prototype.hasOwnProperty.call(user, name);
   user[name] = {
     purpose: inp.purpose, recipientName: inp.recipientName, designation: inp.designation,
     keyPoints: inp.keyPoints, tone: inp.tone, audience: inp.audience, length: inp.length,
@@ -761,7 +792,14 @@ $("saveTplBtn").addEventListener("click", () => {
   setUserTemplates(user);
   rebuildTemplateSelect();
   $("template").value = "user:" + name;
-  toast(`Template "${name}" saved ✓`);
+  $("tplSaveRow").style.display = "none";
+  toast(existed ? `Template "${name}" updated` : `Template "${name}" saved`);
+}
+$("tplSaveConfirm").addEventListener("click", saveTemplateFromForm);
+$("tplSaveCancel").addEventListener("click", () => { $("tplSaveRow").style.display = "none"; });
+$("tplNameInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); saveTemplateFromForm(); }
+  if (e.key === "Escape") $("tplSaveRow").style.display = "none";
 });
 
 $("delTplBtn").addEventListener("click", () => {
