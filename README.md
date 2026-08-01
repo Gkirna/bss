@@ -54,6 +54,7 @@ Refinement works by feeding the previous email back to the model along with the 
 - **Version history** — every Generate/Refine result is kept; browse drafts with ◀ ▶ so a refinement never destroys a version the recruiter preferred. Drafts survive a page reload.
 - **Edit-in-place** — click into the generated email and tweak it; copy/send uses the edited text (human-in-the-loop by design).
 - **Open in mail app** — one click opens the default email client with subject and body prefilled.
+- **Guardrail engine with self-correction** — every draft is *programmatically* validated, not just prompt-hoped: word count vs. the selected length spec, banned template phrases, markdown leakage, and whether key facts (times, days, numbers) from the inputs actually appear in the email. Hard failures trigger one automatic corrective rewrite (the draft plus its failure list goes back to the model), and results are displayed as ✓/⚠ chips under each version.
 - **Placeholder guardrail** — if the draft still contains unfilled `[placeholders]`, copying or sending triggers a warning so "[interview time]" never reaches a real recipient.
 - **Follow-up generator** — one click drafts a polite chase email referencing the previous one (recruiters live in follow-ups).
 - **Personal prompt library** — save the current form as a named template; saved templates appear in the dropdown under "My templates".

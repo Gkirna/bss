@@ -235,6 +235,15 @@
   .ver-nav span { font-size: 0.75rem; color: var(--ink-soft); white-space: nowrap; }
 
   .edit-hint { font-size: 0.75rem; color: var(--ink-soft); margin-top: 6px; }
+
+  /* Guardrail report — programmatic quality checks shown per draft */
+  .guard-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .guard {
+    font-size: 0.72rem; padding: 3px 10px; border-radius: 999px;
+    background: #eef7ef; color: var(--ok); border: 1px solid #cfe8d4;
+  }
+  .guard.warn { background: #fdf6e7; color: #7a5c14; border-color: #ecd9a8; }
+  .guard.info { background: var(--accent-soft); color: var(--accent); border-color: #d8d3ee; }
   .email-body[contenteditable]:focus { outline: 2px solid var(--accent-soft); }
 
   .spinner {
@@ -411,6 +420,7 @@
         </div>
         <div class="email-body" id="outBody" contenteditable="plaintext-only" spellcheck="true"></div>
         <div class="edit-hint">✏️ Click into the email to edit it directly before copying or sending.</div>
+        <div class="guard-row" id="guardRow" style="display:none"></div>
 
         <div class="out-actions">
           <button class="btn btn-ghost btn-small" id="copyBtn">📋 Copy email</button>
@@ -482,10 +492,11 @@ AUDIENCE definitions
 JOB DESCRIPTION (JD) context
 If JD text is provided, extract ONLY the details that strengthen this specific email — role title, company or team name, 2–3 headline skills or requirements, location, work model — and weave them in naturally. Never paste JD sentences wholesale, never enumerate the full requirements list, and if the JD conflicts with the user's key points, the key points win.
 
-LENGTH definitions (these must visibly change the output)
-- Concise: 3–4 sentences total in 1–2 short paragraphs. Roughly 50–80 words. Only the essentials — no context-setting sentence, no pleasantries beyond the greeting.
-- Standard: 2–3 paragraphs, roughly 100–160 words. Brief context, all key points, a clear next step.
-- Detailed: 3–5 paragraphs, roughly 180–280 words. Fuller context, each key point elaborated, an explicit summary of next steps at the end. A short bulleted list is allowed here if it aids clarity.
+LENGTH definitions (HARD requirements — the output MUST visibly differ per setting)
+- Concise: exactly 3–4 sentences, 40–80 words, 1–2 short paragraphs. Essentials only — no context-setting sentence, no pleasantries beyond the greeting. Writing 5+ sentences is a failure.
+- Standard: 5–8 sentences, 100–160 words, 2–3 paragraphs: brief context, every key point, one clear next step.
+- Detailed: 200–320 words in 4 or more paragraphs: (1) a warm opening with context for why you are writing, (2) every key point elaborated with specifics, (3) clear next steps and what the recipient can expect, (4) a courteous close. A short bulleted list is allowed if it aids clarity. It must read noticeably fuller than Standard.
+Before returning, count your words. If the body is outside the range for the requested length, rewrite it until it fits.
 
 OUTPUT FORMAT
 Return valid JSON: {"subject": "...", "body": "..."}
@@ -776,6 +787,103 @@ function validate(inputs) {
 }
 
 /* ============================================================================
+   Length specs — single source of truth for both the prompt (instruction)
+   and the guardrail engine (min/max word validation).
+   ============================================================================ */
+const LENGTH_SPECS = {
+  Concise:  { min: 35,  max: 95,
+    instruction: "Concise — exactly 3–4 sentences, 40–80 words, 1–2 short paragraphs. Essentials only." },
+  Standard: { min: 90,  max: 185,
+    instruction: "Standard — 5–8 sentences, 100–160 words, 2–3 paragraphs: brief context, every key point, one clear next step." },
+  Detailed: { min: 180, max: 340,
+    instruction: "Detailed — 200–320 words in 4+ paragraphs: warm opening with context, every key point elaborated with specifics, clear next steps and expectations, courteous close. Noticeably fuller than a standard email." },
+};
+
+/* ============================================================================
+   Guardrail engine — programmatic checks on every draft (not just prompt
+   hopes). Hard failures trigger ONE automatic corrective rewrite; results
+   are displayed as ✓/⚠ chips under the email.
+   ============================================================================ */
+const BANNED_PHRASES = [
+  "i hope this email finds you well",
+  "i hope this message finds you",
+  "i am writing to",
+  "greetings of the day",
+  "please do not hesitate",
+  "at your earliest convenience",
+];
+
+function countWords(text) { return (text.trim().match(/\S+/g) || []).length; }
+
+function runGuardrails(email, inputs, enforceLength) {
+  const checks = [];
+  const body = email.body || "";
+  const lower = body.toLowerCase();
+
+  // 1. Length actually matches the selected setting (skipped for refinements,
+  //    where the user may have deliberately asked for a different length)
+  const spec = LENGTH_SPECS[inputs.length];
+  const words = countWords(body);
+  if (enforceLength && spec) {
+    if (words < spec.min) {
+      checks.push({ ok: false, hard: true, label: `Too short: ${words} words for ${inputs.length}`,
+        fix: `The body is only ${words} words — too short. Required: ${spec.instruction}` });
+    } else if (words > spec.max) {
+      checks.push({ ok: false, hard: true, label: `Too long: ${words} words for ${inputs.length}`,
+        fix: `The body is ${words} words — too long. Required: ${spec.instruction}` });
+    } else {
+      checks.push({ ok: true, label: `Length: ${words} words — fits ${inputs.length}` });
+    }
+  } else {
+    checks.push({ ok: true, label: `Length: ${words} words` });
+  }
+
+  // 2. No template clichés
+  const banned = BANNED_PHRASES.find((p) => lower.includes(p));
+  if (banned) {
+    checks.push({ ok: false, hard: true, label: `Template phrase: "${banned}"`,
+      fix: `Remove the cliché "${banned}" and rephrase it the way a real person writes.` });
+  } else {
+    checks.push({ ok: true, label: "No template clichés" });
+  }
+
+  // 3. Plain text only — no markdown leakage
+  if (/\*\*|^\s*#/m.test(body)) {
+    checks.push({ ok: false, hard: true, label: "Markdown symbols in body",
+      fix: "Remove all markdown symbols (** and #) — plain text only." });
+  }
+
+  // 4. Key facts (times, days, numbers) from the key points made it in.
+  //    Soft check — words like "five" can't be matched, so warn, never block.
+  const facts = (inputs.keyPoints || "")
+    .match(/\b\d{1,2}:\d{2}\s?(?:am|pm)?\b|\b\d{1,2}\s?(?:am|pm)\b|\b(?:mon|tues|wednes|thurs|fri|satur|sun)day\b|\b\d+\b/gi) || [];
+  const missing = [...new Set(facts.map((f) => f.trim().toLowerCase()))]
+    .filter((f) => !lower.includes(f));
+  if (facts.length && missing.length) {
+    checks.push({ ok: false, hard: false, label: `Check manually — possibly missing: ${missing.slice(0, 3).join(", ")}` });
+  } else if (facts.length) {
+    checks.push({ ok: true, label: "Key facts present" });
+  }
+
+  return checks;
+}
+
+function renderGuardrailsUI(email) {
+  const row = $("guardRow");
+  row.innerHTML = "";
+  if (!email.checks || !email.checks.length) { row.style.display = "none"; return; }
+  row.style.display = "flex";
+  const add = (text, cls) => {
+    const s = document.createElement("span");
+    s.className = "guard" + (cls ? " " + cls : "");
+    s.textContent = text;
+    row.appendChild(s);
+  };
+  if (email.corrected) add("🛠 auto-corrected", "info");
+  for (const c of email.checks) add((c.ok ? "✓ " : "⚠ ") + c.label, c.ok ? "" : "warn");
+}
+
+/* ============================================================================
    Building the user prompt for the model
    ============================================================================ */
 function buildUserPrompt(inputs, refinement) {
@@ -786,7 +894,7 @@ function buildUserPrompt(inputs, refinement) {
     `Recipient: ${inputs.recipientName || "(not given)"}${inputs.designation ? ", " + inputs.designation : ""}`,
     `Key points: ${inputs.keyPoints || "(none given)"}`,
     `Tone: ${inputs.tone}`,
-    `Length: ${inputs.length}`,
+    `LENGTH (hard requirement): ${LENGTH_SPECS[inputs.length] ? LENGTH_SPECS[inputs.length].instruction : inputs.length}`,
     `Sender name: ${inputs.senderName || "(not given — use [Your Name])"}`,
   ];
   if (inputs.jd) {
@@ -1039,7 +1147,38 @@ async function generate(refinement = null) {
 
   setLoading(true);
   try {
-    const email = await callAI(buildUserPrompt(inputs, refinement));
+    const prompt = buildUserPrompt(inputs, refinement);
+    // Length is enforced on fresh generations and plain regenerates; a refine
+    // instruction ("make it shorter") or follow-up may legitimately change it.
+    const enforceLength = refinement === null || refinement === "";
+
+    let email = await callAI(prompt);
+    let checks = runGuardrails(email, inputs, enforceLength);
+    let corrected = false;
+
+    // Self-correction loop: on hard failures, send the draft back with the
+    // failure list for ONE corrective rewrite. Keep whichever draft is cleaner.
+    const hardFails = checks.filter((c) => c.hard && !c.ok);
+    if (hardFails.length) {
+      try {
+        generateLabel.textContent = "Improving draft…";
+        const fixPrompt = prompt +
+          "\n\nYou produced this draft:\nSubject: " + email.subject + "\n" + email.body +
+          "\n\nIt FAILED these quality checks:\n" +
+          hardFails.map((c) => "- " + c.fix).join("\n") +
+          "\nRewrite the email correcting every issue. Keep the same facts and tone.";
+        const retry = await callAI(fixPrompt);
+        const retryChecks = runGuardrails(retry, inputs, enforceLength);
+        if (retryChecks.filter((c) => c.hard && !c.ok).length <= hardFails.length) {
+          email = retry;
+          checks = retryChecks;
+          corrected = true;
+        }
+      } catch { /* corrective pass failed — keep the first draft */ }
+    }
+
+    email.checks = checks;
+    email.corrected = corrected;
     lastEmail = email;
     lastInputs = inputs;
     pushVersion(email);
@@ -1060,12 +1199,13 @@ function setLoading(on) {
   generateLabel.textContent = on ? "Writing…" : "Generate email";
 }
 
-function renderEmail({ subject, body }) {
+function renderEmail(email) {
   outEmpty.style.display = "none";
   outBlock.style.display = "block";
-  outSubject.textContent = subject;
+  outSubject.textContent = email.subject;
   // Normalise whitespace: collapse 3+ newlines, trim — clean paragraphs
-  outBody.textContent = body.replace(/\n{3,}/g, "\n\n").trim();
+  outBody.textContent = email.body.replace(/\n{3,}/g, "\n\n").trim();
+  renderGuardrailsUI(email); // per-draft ✓/⚠ quality chips (stored per version)
   showError("");
 }
 
