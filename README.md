@@ -1,88 +1,150 @@
 # BSS AI Email Generator
 
-A browser-based tool that turns simple inputs (purpose, recipient, key points, tone, length) into ready-to-send recruiting emails. Built for the Bangalore Strategic Solutions **AI Automation Intern** assignment.
+A browser-based tool that turns simple inputs (purpose, recipient, key points, tone, length) into ready-to-send recruiting emails — with programmatic quality guardrails, draft history, and production-grade key handling. Built for the Bangalore Strategic Solutions **AI Automation Intern** assignment.
 
-**Live demo:** https://gkirna.github.io/bss/
+**Live demo:** https://bssemail.netlify.app — no API key or setup needed; open it and generate.
+**Code:** https://github.com/Gkirna/bss
+**Run locally:** download the repo and double-click `index.html` (you'll paste your own free Gemini or OpenAI key — see [Two runtime modes](#two-runtime-modes)).
 
 ---
 
-## How to use it
+## How a recruiter uses it
 
-1. Open the link (or just double-click `index.html` — no install, no server).
-2. Paste an API key into the bar at the top (one-time — it's remembered by your browser). Two options, auto-detected from the key format:
-   - a **free Gemini key** from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) (`AIza…`), or
-   - an **OpenAI key** from [platform.openai.com/api-keys](https://platform.openai.com/api-keys) (`sk-…`, requires paid credits).
-3. Pick a quick-start template or fill in the form, choose a tone and length, and click **Generate email**.
-4. Use **Regenerate** for a fresh take, or type an instruction like *"make it shorter"* and click **Refine**.
-5. **Copy email** puts the whole thing (subject + body, clean paragraphs) on your clipboard.
+1. Pick a **quick-start template** (or fill the form): purpose, who it's going to, recipient name/designation, key points, tone, length.
+2. Click **Generate email** → a subject line and complete email appear, with quality-check chips underneath.
+3. **Refine** ("make it shorter", "add urgency"), **Regenerate** for a fresh take, or click into the email and **edit it directly** — then **Copy email** or **Open in mail app**.
 
-## Which API and why
+No instructions needed beyond what's on screen — that was the assignment's usability bar.
 
-The tool supports **two providers, auto-detected from the key prefix** — Google Gemini (primary) and OpenAI (alternative):
+---
 
-1. **Gemini as the default** because of its **free tier** — a recruiter (or an evaluator!) can try the tool without a credit card.
-2. **Browser-friendly** — both REST endpoints allow direct calls from a web page (CORS-enabled), so the whole tool is a single static HTML file with no backend, as the assignment requires ("no installs, no local servers").
-3. **Guaranteed JSON** — Gemini's `responseSchema` and OpenAI's `response_format: json_object` both force parseable `{subject, body}` output. No fragile string parsing.
-4. **Resilience** — each provider has a fallback list of model names (model naming varies by account/region); the first one that works is remembered by the browser. The same system prompt drives both providers unchanged, which shows the prompt design is provider-agnostic.
+## Assignment requirements — all covered
 
-## How the API keys are kept secure and out of the code
+| Requirement (from the brief) | Where |
+|---|---|
+| Inputs: purpose, recipient + designation, key points, tone (4 options) | Form, left panel |
+| Output: complete email body + subject line | Output panel |
+| Regenerate + refinement text box | Refine row with quick chips; Regenerate button |
+| ≥3 quick-start templates that auto-fill the form | 4 built-ins: Interview Scheduling, Offer Follow-up, Client Status Update, Candidate Rejection |
+| Length toggle that *actually* changes output | Hard word/paragraph contracts, enforced by validation (see Guardrails) |
+| One-click copy with clean formatting | Copy email / Copy subject |
+| Edge-case handling | See [table below](#edge-case-handling) |
+| System prompt shown | In `index.html` (search `SYSTEM_PROMPT`) and [explained below](#the-system-prompt) |
+| API key kept out of code | Two runtime modes, both keyless-in-code (below) |
 
-- **No key ever appears in the source.** Users paste their own key(s) at runtime — Gemini and OpenAI each have a separate field, and a "Use" switch picks the active provider (auto-selected when only one key is saved).
-- **Keys live only in that user's browser** (`localStorage`), scoped to this site by the browser's same-origin policy. They never appear in the repo, the hosted files, or any server logs — there is no server.
-- **Keys travel only over HTTPS, directly to the chosen provider** (Google or OpenAI). No third party, including the tool's host, ever sees them.
-- In a production rollout I would go one step further: a tiny serverless proxy holding one company key, so end users paste nothing at all — see Limitations.
+---
 
-## The system prompt (and what it does)
+## Feature guide
 
-The full prompt is in `index.html` (search for `SYSTEM_PROMPT`). The design in brief:
+### Generation core
+- **Tone** (Professional / Friendly / Formal / Assertive) — each has a concrete behavioral definition in the system prompt, including greeting style, not just a label.
+- **Audience** (Candidate / Client / Internal team) — changes register *and* adds confidentiality rules: e.g. client-side details (budgets, other candidates) are never revealed in candidate emails.
+- **Length contracts** — Concise: 3–4 sentences / 40–80 words; Standard: 100–160 words; Detailed: 200–320 words in 4+ paragraphs with mandatory structure (context → elaborated key points → next steps → close). Stated in the system prompt, restated per-request, and *verified in code* after generation.
 
-- **Role**: the model acts as an experienced BSS recruitment consultant whose emails are sent as-is.
-- **Anti-hallucination hard rule**: use *only* the facts provided; missing details become visible `[bracketed placeholders]` instead of invented dates/links — critical for a tool whose output gets sent to real candidates and clients.
-- **Anti-template rule**: banned phrases ("I hope this email finds you well", "please do not hesitate"…) and an instruction to vary sentence structure, so the output sounds human.
-- **Tone definitions**: each of the 4 tones (Professional / Friendly / Formal / Assertive) gets a concrete behavioral definition — including greeting style — rather than just a label.
-- **Length definitions with hard numbers**: Concise = 3–4 sentences / ~50–80 words, Standard ≈ 100–160 words, Detailed ≈ 180–280 words with an explicit next-steps close. This is what makes the length toggle *actually* change the output.
-- **Vague-input handling**: if purpose is missing, the model infers intent from the key points instead of refusing.
-- **Output contract**: strict JSON `{subject, body}`, paragraphs separated by blank lines, no markdown — enforced doubly by Gemini's `responseSchema`.
+### Job-description awareness
+Paste a JD, or attach / drag-and-drop a **.pdf, .docx, .txt or .md** file — parsed entirely in the browser (parser libraries load on demand; the file is never uploaded anywhere). The model is instructed to extract only what strengthens the email (role title, company, 2–3 headline skills, location) and never dump JD text wholesale. Input capped at 8K characters to bound token cost. The JD is also declared **untrusted data** in the system prompt: instructions hidden inside a JD ("ignore your rules…") are explicitly ignored — prompt-injection defense.
 
-Refinement works by feeding the previous email back to the model along with the user's instruction ("make it shorter", "add urgency") and requiring a *clearly noticeable* change while keeping facts intact. Plain Regenerate does the same but asks for "different wording and structure — same facts, fresh take."
+### Guardrail engine (validation, not hope)
+After every generation, **JavaScript — not the model — checks the draft**:
 
-## Beyond the brief (bonus features)
+1. **Length** — word count must fall inside the selected setting's range (skipped when a refinement like "make it shorter" deliberately overrides length).
+2. **Template clichés** — banned-phrase scan ("I hope this email finds you well", "please do not hesitate", …).
+3. **Plain text** — no markdown symbols leaking into the email.
+4. **Fact presence** — times, weekdays, and numbers from the key points must actually appear in the email (soft warning, since "5" may legitimately become "five").
 
-- **JD-aware emails** — paste or attach a job description; the model extracts only the relevant details (role title, company, headline skills) and weaves them in, per an explicit anti-dumping rule in the system prompt. Input is capped at 8K characters to control token usage.
-- **Audience targeting** — Candidate / Client / Internal team changes register and confidentiality rules (e.g. never reveal client-side details to a candidate).
-- **Two providers, auto-fallback models** — Gemini (free) and OpenAI, each with its own key field; the same system prompt drives both, showing the prompt design is provider-agnostic.
-- **Version history** — every Generate/Refine result is kept; browse drafts with ◀ ▶ so a refinement never destroys a version the recruiter preferred. Drafts survive a page reload.
-- **Draft history** — the last 50 generated emails are archived locally; a History panel lets the recruiter reload yesterday's draft (refine/copy work on it), delete entries, or clear all. Nothing leaves the browser.
-- **Telemetry per draft** — model, latency, token usage, and prompt version shown under each email; the server logs the same as structured JSON (no content logged) for LLM-ops observability.
-- **Edit-in-place** — click into the generated email and tweak it; copy/send uses the edited text (human-in-the-loop by design).
-- **Open in mail app** — one click opens the default email client with subject and body prefilled.
-- **Guardrail engine with self-correction** — every draft is *programmatically* validated, not just prompt-hoped: word count vs. the selected length spec, banned template phrases, markdown leakage, and whether key facts (times, days, numbers) from the inputs actually appear in the email. Hard failures trigger one automatic corrective rewrite (the draft plus its failure list goes back to the model), and results are displayed as ✓/⚠ chips under each version.
-- **Placeholder guardrail** — if the draft still contains unfilled `[placeholders]`, copying or sending triggers a warning so "[interview time]" never reaches a real recipient.
-- **Follow-up generator** — one click drafts a polite chase email referencing the previous one (recruiters live in follow-ups).
-- **Personal prompt library** — save the current form as a named template; saved templates appear in the dropdown under "My templates".
-- **PDF/DOCX JD parsing** — attach a real JD file; parsed entirely in the browser (parser libraries load on demand), never uploaded anywhere.
-- **Managed-key mode** — when deployed on Netlify with server-side env keys (see `DEPLOYMENT.md`), the app auto-detects the proxy (`netlify/functions/generate.mjs`), hides the key inputs, and users paste nothing. Includes per-IP rate limiting.
+**Self-correction loop:** if a hard check fails, the failed draft plus its failure list is automatically sent back to the model for one corrective rewrite ("Improving draft…" on the button); the cleaner draft wins. Results render as green/amber **chips under every email**, stored per version, with an "auto-corrected" chip when the loop fired.
+
+**Placeholder guardrail:** missing details become visible `[bracketed placeholders]` rather than invented facts (anti-hallucination rule) — and if a draft still contains one, **Copy** and **Open in mail app** raise a warning naming it, so "[interview time]" never reaches a real candidate.
+
+### Iteration tools
+- **Refine** — free-text instruction plus quick chips; the previous email is fed back with the instruction and a requirement that the change be clearly noticeable.
+- **Regenerate** — same facts, explicitly different wording and structure.
+- **Follow-up** — one click drafts a polite chase email referencing the current one (shorter, restates the ask).
+- **Version navigation (◀ v2/4 ▶)** — every result is kept in the session chain; a refinement never destroys a draft you preferred. Versions survive a page reload.
+- **Edit-in-place** — click into the email and type; Copy/Send/Refine all use the edited text. Human-in-the-loop by design: the AI drafts, the recruiter approves.
+
+### Draft history
+The last **50 generated emails are archived locally** (browser storage only — nothing leaves the machine). The **History** button lists them with subject, recipient, length, and timestamp; clicking one reloads it into the working chain — Refine, Follow-up, and Copy all work on it, and its quality chips and telemetry come back with it. Individual delete and clear-all included.
+
+### Personal prompt library
+**Save as template** captures the current form under a name you type in an inline row (pre-suggested from the selected template or purpose; Enter saves; saving an existing name updates it). Saved templates appear in the dropdown under "My templates" and persist in the browser. The 4 built-ins plus this turn the tool into a growing, reusable prompt library.
+
+### Telemetry (LLM-ops)
+Under each draft: provider + model used, end-to-end latency, input/output token counts, and the **prompt version** — a constant bumped on every system-prompt change so quality shifts are traceable to an exact revision. Server-side, every request emits one structured JSON log line (provider, model, latency, tokens, prompt version, outcome) visible in Netlify's function logs. **No prompt or email content is ever logged** — privacy by design.
+
+---
+
+## Two runtime modes
+
+The app probes its host at load and picks the right mode automatically:
+
+| Mode | When | Key handling |
+|---|---|---|
+| **Managed-key** (the live demo) | Deployed on Netlify with server env vars | The key lives only in the environment of `netlify/functions/generate.mjs`. The browser never sees it — no key UI is shown at all. |
+| **Bring-your-own-key** | Local file, or any static host | Each user pastes a free Gemini key (`AIza…`) or OpenAI key (`sk-…`) — stored only in *their* browser's localStorage, sent over HTTPS directly to the provider. Never in code, never uploaded. |
+
+**Provider strategy:** Gemini (free tier — anyone can try it without a card) and OpenAI, each with a fallback list of model names (naming varies by account/region; the first working model is remembered). The same system prompt drives both providers unchanged — the prompt design is provider-agnostic. Both are called in JSON mode (Gemini `responseSchema` / OpenAI `json_object`), so `{subject, body}` parsing can never break.
+
+**Proxy hardening** (managed mode): requests are rejected unless they originate from the site itself; per-IP rate limit (10 generations/minute); input size caps; per-request output-token caps; and the final backstop is a spending limit set at the provider. Defense in depth — because client-visible checks alone can always be spoofed.
+
+---
+
+## The system prompt
+
+The full prompt is in `index.html` (search `SYSTEM_PROMPT`). What each part does:
+
+- **Role**: an experienced BSS recruitment consultant whose emails are sent as-is — sets register and stakes.
+- **Hard anti-hallucination rule**: use *only* facts provided; missing details become visible `[placeholders]`, never invented dates/links/figures.
+- **Anti-template rules**: banned openers and filler phrases, instruction to vary sentence structure — so output sounds human, not generated.
+- **Tone definitions** with concrete greeting/register behavior per tone.
+- **Audience definitions** with confidentiality boundaries per audience.
+- **JD extraction rules** plus the untrusted-data clause (prompt-injection defense).
+- **Length contracts** with numeric ranges and a self-count instruction.
+- **Vague-input handling**: a missing purpose is inferred from the key points instead of refusing.
+- **Output contract**: strict JSON `{subject, body}`, blank-line paragraphs, no markdown.
+
+Refinements feed the previous email back with the user's instruction and require a clearly noticeable change; regenerates require different wording with the same facts; follow-ups are generated as new emails referencing the prior one.
+
+---
 
 ## Edge-case handling
 
 | Situation | Behavior |
 |---|---|
-| Everything empty | Generation blocked with a friendly message — nothing to write from |
-| No API key | Blocked with a pointer to the free-key link |
-| No recipient name | Warning shown; model uses a sensible generic greeting |
-| No purpose, but key points given | Warning shown; model infers the purpose |
-| No key points | Warning shown; email is general and uses `[placeholders]` for missing specifics |
-| Missing specifics (time, link…) | Model inserts visible `[bracketed placeholders]` rather than inventing facts |
-| Invalid API key / rate limit / network error | Human-readable error messages, no console-only failures |
+| Everything empty | Blocked with a friendly message — nothing to write from |
+| No key (key mode) | Blocked with a pointer to the free-key link; wrong-format key caught with a specific hint |
+| No recipient name | Warning; sensible generic greeting used |
+| No purpose, key points given | Warning; purpose inferred from key points |
+| No key points | Warning; general email with visible `[placeholders]` |
+| Missing specifics (time, link…) | `[bracketed placeholders]` + copy/send warning — never invented |
+| JD with hidden instructions | Ignored (untrusted-data rule) |
+| Scanned/unreadable JD file | Clear message: paste the text instead |
+| Model unavailable on the account | Automatic fallback through a list of model names |
+| Invalid key / no credits / rate limit / network error | Each mapped to a specific human-readable message |
+| Draft fails quality checks | One automatic corrective rewrite, then honest chips |
+
+---
+
+## Architecture
+
+- **One HTML file** (`index.html`): all UI, prompt engineering, guardrails, and state — vanilla HTML/CSS/JS, no frameworks, no build step, per the assignment's "we want to see your code" rule. Commented throughout.
+- **One serverless function** (`netlify/functions/generate.mjs`): the managed-key proxy with logging and abuse protection. The app works fully without it (key mode) — it's an enhancement, not a dependency.
+- Desktop layout is an app shell: form pane and output pane scroll independently (like a mail client); narrow screens fall back to a normal single-column page.
 
 ## Known limitations
 
-- **Key-per-user**: each user needs their own free Gemini key. A production version would hide the key behind a serverless proxy (Netlify/Vercel function) with basic rate limiting.
-- **Free-tier rate limits**: a handful of requests per minute; the tool surfaces a clear "wait ~30s" message when hit.
-- **English only** for now; JD attachment reads plain-text files (`.txt`/`.md`) — PDF/DOCX parsing would need a library or backend.
-- Version history lives in memory only (cleared on page reload).
+- "Open in mail app" can truncate very long Detailed emails (mailto URL limits in some clients) — Copy is the primary path.
+- The fact-presence check can't match numbers written as words ("five") — hence a warning, not a block.
+- Serverless rate-limit memory resets on cold starts — the provider-side spending cap is the true cost backstop.
+- History and saved templates are per-browser (no accounts/sync) — a deliberate scope choice; the roadmap in `MASTERPLAN.md` covers the multi-user version.
+- English output only for now.
 
-## Running / deploying
+## Repo guide
 
-- **Locally**: double-click `index.html`. That's it.
-- **Hosted**: push this folder to a GitHub repo → Settings → Pages → deploy from `main`. Or drag the folder onto [app.netlify.com/drop](https://app.netlify.com/drop).
+| File | What it is |
+|---|---|
+| `index.html` | The entire application (UI + prompts + guardrails) |
+| `netlify/functions/generate.mjs` | Managed-key proxy (env keys, origin check, rate limit, logs) |
+| `netlify.toml` | Netlify build/functions config |
+| `DEPLOYMENT.md` | Both hosting modes, step by step |
+| `MASTERPLAN.md` | Production roadmap (pipeline integration, evals, agentic automation) |
