@@ -4,7 +4,7 @@ A browser-based tool that turns simple inputs (purpose, recipient, key points, t
 
 **Live demo:** https://bssemail.netlify.app — no API key or setup needed; open it and generate.
 **Code:** https://github.com/Gkirna/bss
-**Run locally:** download the repo and double-click `index.html` (you'll paste your own Gemini or OpenAI key — see [Two runtime modes](#two-runtime-modes)).
+**Run locally:** download the repo and double-click `index.html` (you'll paste your own OpenAI or Gemini key — see [Two runtime modes](#two-runtime-modes)).
 
 ---
 
@@ -83,7 +83,7 @@ The app probes its host at load and picks the right mode automatically:
 | **Managed-key** (the live demo) | Deployed on Netlify with server env vars | The key lives only in the environment of `netlify/functions/generate.mjs`. The browser never sees it — no key UI is shown at all. |
 | **Bring-your-own-key** | Local file, or any static host | Each user pastes a free Gemini key (`AIza…`) or OpenAI key (`sk-…`) — stored only in *their* browser's localStorage, sent over HTTPS directly to the provider. Never in code, never uploaded. |
 
-**Provider strategy:** Google Gemini and OpenAI, each with a fallback list of model names (naming varies by account/region; the first working model is remembered). The same system prompt drives both providers unchanged — the prompt design is provider-agnostic. Both are called in JSON mode (Gemini `responseSchema` / OpenAI `json_object`), so `{subject, body}` parsing can never break.
+**Which API and why:** **OpenAI** (`gpt-4o-mini`, with automatic fallback across model names) — it powers the live deployment. Chosen for its reliable JSON mode, strong short-form business writing, and low per-email cost. The architecture is deliberately **provider-agnostic**: the same system prompt also runs unchanged on **Google Gemini**, supported as an alternative backend in bring-your-own-key mode — proof the prompt design isn't tied to one vendor. Both providers are called in JSON mode (OpenAI `json_object` / Gemini `responseSchema`), so `{subject, body}` parsing can never break.
 
 **Proxy hardening** (managed mode): requests are rejected unless they originate from the site itself; per-IP rate limit (10 generations/minute); input size caps; per-request output-token caps; and the final backstop is a spending limit set at the provider. Defense in depth — because client-visible checks alone can always be spoofed.
 

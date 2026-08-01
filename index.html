@@ -10,9 +10,11 @@
   Built for the Bangalore Strategic Solutions "AI Automation Intern" assignment.
 
   Stack   : Single-file HTML + CSS + vanilla JavaScript (no frameworks, no build)
-  AI APIs : Google Gemini and OpenAI — same system prompt drives
-            both; each has a model-name fallback list. Called in JSON mode so
-            {subject, body} parsing can never break.
+  AI API  : OpenAI (gpt-4o-mini, with automatic model fallbacks) — this is
+            what the live deployment uses. Google Gemini is supported as an
+            alternative backend (bring-your-own-key mode); the same system
+            prompt drives both. Called in JSON mode so {subject, body}
+            parsing can never break.
   API key : Two modes, auto-detected at load (see README):
             - Managed-key: deployed with a serverless proxy
               (netlify/functions/generate.mjs) holding the key in env vars;
@@ -338,8 +340,8 @@
     <div class="keyrow provider-row">
       <label for="provider">Use</label>
       <select id="provider">
-        <option value="gemini">Gemini</option>
         <option value="openai">OpenAI</option>
+        <option value="gemini">Gemini</option>
       </select>
     </div>
     <div class="hint" id="keyHint">
@@ -664,7 +666,7 @@ for (const cfg of Object.values(KEYS)) {
     autoSelectProvider();
   });
 }
-providerSelect.value = localStorage.getItem(PROVIDER_STORAGE) || "gemini";
+providerSelect.value = localStorage.getItem(PROVIDER_STORAGE) || "openai";
 providerSelect.addEventListener("change", () => {
   localStorage.setItem(PROVIDER_STORAGE, providerSelect.value);
   updateKeybarSummary();
