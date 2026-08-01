@@ -956,13 +956,15 @@ function buildUserPrompt(inputs, refinement) {
     const res = await fetch("/.netlify/functions/generate", { method: "GET" });
     if (!res.ok) return;
     const info = await res.json();
-    if (info.proxy === true) {
+    // Managed mode only counts when the server actually has a key configured;
+    // a deployed function with no env keys falls back to bring-your-own-key.
+    if (info.proxy === true && (info.openai || info.gemini)) {
       proxyAvailable = true;
       // Managed-key mode: the entire API section disappears — a recruiter
       // just fills the form. Provider follows what the server has configured.
       $("keybar").style.display = "none";
       if (info.openai) providerSelect.value = "openai";
-      else if (info.gemini) providerSelect.value = "gemini";
+      else providerSelect.value = "gemini";
     }
   } catch { /* not deployed with functions — user-key mode */ }
 })();
