@@ -10,13 +10,18 @@
   Built for the Bangalore Strategic Solutions "AI Automation Intern" assignment.
 
   Stack   : Single-file HTML + CSS + vanilla JavaScript (no frameworks, no build)
-  AI API  : Google Gemini (gemini-2.5-flash) — free tier, callable directly
-            from the browser, no server needed.
-  API key : Entered by the user at runtime, stored ONLY in the browser's
-            localStorage. Never committed to code. (See README.)
+  AI APIs : Google Gemini (free tier) and OpenAI — same system prompt drives
+            both; each has a model-name fallback list. Called in JSON mode so
+            {subject, body} parsing can never break.
+  API key : Two modes, auto-detected at load (see README):
+            - Managed-key: deployed with a serverless proxy
+              (netlify/functions/generate.mjs) holding the key in env vars;
+              the browser never sees a key and shows no key UI.
+            - Bring-your-own-key: user pastes a key, stored ONLY in their
+              browser's localStorage. Never committed to code.
 
   The full SYSTEM PROMPT is defined below in the <script> section — search
-  for "SYSTEM_PROMPT". It is also documented in README.md.
+  for "SYSTEM_PROMPT". It is also pasted verbatim in README.md.
   ============================================================================
 -->
 <style>
