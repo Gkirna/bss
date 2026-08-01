@@ -52,6 +52,8 @@ Refinement works by feeding the previous email back to the model along with the 
 - **Audience targeting** — Candidate / Client / Internal team changes register and confidentiality rules (e.g. never reveal client-side details to a candidate).
 - **Two providers, auto-fallback models** — Gemini (free) and OpenAI, each with its own key field; the same system prompt drives both, showing the prompt design is provider-agnostic.
 - **Version history** — every Generate/Refine result is kept; browse drafts with ◀ ▶ so a refinement never destroys a version the recruiter preferred. Drafts survive a page reload.
+- **Draft history** — the last 50 generated emails are archived locally; a History panel lets the recruiter reload yesterday's draft (refine/copy work on it), delete entries, or clear all. Nothing leaves the browser.
+- **Telemetry per draft** — model, latency, token usage, and prompt version shown under each email; the server logs the same as structured JSON (no content logged) for LLM-ops observability.
 - **Edit-in-place** — click into the generated email and tweak it; copy/send uses the edited text (human-in-the-loop by design).
 - **Open in mail app** — one click opens the default email client with subject and body prefilled.
 - **Guardrail engine with self-correction** — every draft is *programmatically* validated, not just prompt-hoped: word count vs. the selected length spec, banned template phrases, markdown leakage, and whether key facts (times, days, numbers) from the inputs actually appear in the email. Hard failures trigger one automatic corrective rewrite (the draft plus its failure list goes back to the model), and results are displayed as ✓/⚠ chips under each version.
