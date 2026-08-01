@@ -10,7 +10,7 @@
   Built for the Bangalore Strategic Solutions "AI Automation Intern" assignment.
 
   Stack   : Single-file HTML + CSS + vanilla JavaScript (no frameworks, no build)
-  AI APIs : Google Gemini (free tier) and OpenAI — same system prompt drives
+  AI APIs : Google Gemini and OpenAI — same system prompt drives
             both; each has a model-name fallback list. Called in JSON mode so
             {subject, body} parsing can never break.
   API key : Two modes, auto-detected at load (see README):
@@ -338,7 +338,7 @@
     <div class="keyrow provider-row">
       <label for="provider">Use</label>
       <select id="provider">
-        <option value="gemini">Gemini (free tier)</option>
+        <option value="gemini">Gemini</option>
         <option value="openai">OpenAI</option>
       </select>
     </div>
@@ -1218,7 +1218,7 @@ async function callGeminiModel(key, model, userPrompt) {
       throw new Error("The API key looks invalid. Double-check it (or create a new one at aistudio.google.com/apikey).");
     }
     if (res.status === 429) {
-      throw new Error("Rate limit hit — the free tier allows a few requests per minute. Wait ~30 seconds and try again.");
+      throw new Error("Rate limit hit — Gemini allows a limited number of requests per minute. Wait ~30 seconds and try again.");
     }
     throw new Error(`The AI service returned an error (${res.status}). Please try again.`);
   }
