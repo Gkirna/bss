@@ -67,17 +67,34 @@ export default async (req, context) => {
 
   let body;
   try { body = await req.json(); } catch { body = null; }
-  const { provider = "gemini", systemPrompt, userPrompt } = body || {};
+  const { provider = "gemini", systemPrompt, userPrompt, promptVersion = null } = body || {};
   if (!systemPrompt || !userPrompt || userPrompt.length > 20_000 || systemPrompt.length > 20_000) {
     return Response.json({ error: "Bad request" }, { status: 400 });
   }
 
+  // LLM-ops: one structured log line per request (never the prompt/output
+  // content itself — privacy by design). Visible under Logs → Functions.
+  const started = Date.now();
   try {
     const email = provider === "openai"
       ? await callOpenAI(systemPrompt, userPrompt)
       : await callGemini(systemPrompt, userPrompt);
+    console.log(JSON.stringify({
+      evt: "generate", ok: true, provider,
+      model: email.meta && email.meta.model,
+      ms: Date.now() - started,
+      inTok: email.meta && email.meta.inTok,
+      outTok: email.meta && email.meta.outTok,
+      promptVersion,
+      promptChars: userPrompt.length,
+    }));
     return Response.json(email);
   } catch (err) {
+    console.log(JSON.stringify({
+      evt: "generate", ok: false, provider,
+      ms: Date.now() - started, promptVersion,
+      error: String(err.message || err).slice(0, 200),
+    }));
     return Response.json(
       { error: err.message || "Generation failed. Please try again." },
       { status: 502 },
@@ -118,7 +135,10 @@ async function callGemini(systemPrompt, userPrompt) {
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error("Empty AI response. Please try again.");
-    return validateEmail(JSON.parse(text));
+    const email = validateEmail(JSON.parse(text));
+    const u = data.usageMetadata || {};
+    email.meta = { provider: "Gemini", model, inTok: u.promptTokenCount ?? null, outTok: u.candidatesTokenCount ?? null };
+    return email;
   }
   throw new Error(`No Gemini model available (last status ${lastStatus}).`);
 }
@@ -148,7 +168,10 @@ async function callOpenAI(systemPrompt, userPrompt) {
     const data = await res.json();
     const text = data?.choices?.[0]?.message?.content;
     if (!text) throw new Error("Empty AI response. Please try again.");
-    return validateEmail(JSON.parse(text));
+    const email = validateEmail(JSON.parse(text));
+    const u = data.usage || {};
+    email.meta = { provider: "OpenAI", model, inTok: u.prompt_tokens ?? null, outTok: u.completion_tokens ?? null };
+    return email;
   }
   throw new Error("No OpenAI model available on this account.");
 }
